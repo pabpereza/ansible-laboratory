@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------
+  # Control Node (Web IDE: Code-Server)
+  # ----------------------------------------------------
+  control:
+    build:
+      context: .
+      dockerfile: Dockerfile.control
+    container_name: __ALUMNO_ID__-control
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - PASSWORD=ansible # Contraseña para entrar al Code-Server web
+      - SUDO_PASSWORD=ansible # Contraseña sudo dentro del contenedor
+    volumes:
+      - ./workspace:/config/workspace
+    networks:
+      - __ALUMNO_ID__-net
+      - proxy
+    labels:
+      # Configuración de Traefik
+      - "traefik.enable=true"
+      - "traefik.http.routers.__ALUMNO_ID__-control.rule=Host(`__ALUMNO_ID__.__DOMINIO__`)"
+      - "traefik.http.routers.__ALUMNO_ID__-control.entrypoints=websecure"
+      - "traefik.http.routers.__ALUMNO_ID__-control.tls.certresolver=myresolver"
+      - "traefik.http.services.__ALUMNO_ID__-control.loadbalancer.server.port=8443"
+    restart: unless-stopped
+
+  # ----------------------------------------------------
+  # Target Node 1 (Debian with systemd + DinD + SSH)
+  # ----------------------------------------------------
+  target1:
+    build:
+      context: .
+      dockerfile: Dockerfile.target
+    container_name: __ALUMNO_ID__-target1
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - __ALUMNO_ID__-target1-docker:/var/lib/docker
+    networks:
+      - __ALUMNO_ID__-net
+    command: /lib/systemd/systemd
+    restart: unless-stopped
+  target2:
+    build:
+      context: .
+      dockerfile: Dockerfile.target
+    container_name: __ALUMNO_ID__-target2
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - __ALUMNO_ID__-target2-docker:/var/lib/docker
+    networks:
+      - __ALUMNO_ID__-net
+    command: /lib/systemd/systemd
+    restart: unless-stopped
+
+networks:
+  __ALUMNO_ID__-net:
+    name: __ALUMNO_ID__-net
+  proxy:
+    external: true
+
+volumes:
+  # Volúmenes dedicados para Docker in Docker (evita problemas con OverlayFS)
+  __ALUMNO_ID__-target1-docker:
+  __ALUMNO_ID__-target2-docker:

@@ -1,0 +1,23 @@
+FROM linuxserver/code-server:latest
+
+# Instalar dependencias necesarias para el curso:
+# - ansible: motor de automatización
+# - openssh-client: para conectar a los target nodes
+# - sshpass: útil para la conexión por contraseña si es necesario
+# - iputils-ping, nano, vim: herramientas comunes de terminal
+RUN apt-get update && \
+    apt-get install -y software-properties-common && \
+    apt-add-repository --yes --update ppa:ansible/ansible && \
+    apt-get install -y \
+        ansible \
+        openssh-client \
+        sshpass \
+        iputils-ping \
+        nano \
+        vim && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Configuración opcional por defecto para ansible (para ignorar host key checking en el laboratorio)
+RUN mkdir -p /etc/ansible && \
+    echo "[defaults]\nhost_key_checking = False" > /etc/ansible/ansible.cfg

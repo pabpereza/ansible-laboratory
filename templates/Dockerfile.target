@@ -1,0 +1,52 @@
+FROM debian:12
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependencias esenciales:
+# - systemd: para ejecutar servicios de manera real
+# - openssh-server: para que Ansible se conecte por SSH
+# - sudo, python3: requerimientos típicos de Ansible
+RUN apt-get update && \
+    apt-get install -y \
+        systemd \
+        systemd-sysv \
+        openssh-server \
+        sudo \
+        python3 \
+        python3-apt \
+        iproute2 \
+        curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Limpiar units de systemd que no tienen sentido en un contenedor Docker
+RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
+    /etc/systemd/system/*.wants/* \
+    /lib/systemd/system/local-fs.target.wants/* \
+    /lib/systemd/system/sockets.target.wants/*udev* \
+    /lib/systemd/system/sockets.target.wants/*initctl* \
+    /lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup* \
+    /lib/systemd/system/systemd-update-utmp*
+
+# Configurar SSH para permitir root y conexiones estándar
+RUN mkdir /var/run/sshd && \
+    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+# Crear un usuario "ansible" con contraseña "ansible" y privilegios sudo sin contraseña
+RUN useradd -rm -d /home/ansible -s /bin/bash -g root -G sudo -u 1000 ansible && \
+    echo 'ansible:ansible' | chpasswd && \
+    echo "ansible ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# También configuramos contraseña "ansible" para root por si acaso
+RUN echo 'root:ansible' | chpasswd
+
+# Habilitar el servicio de SSH automáticamente por systemd
+RUN systemctl enable ssh
+
+EXPOSE 22
+
+# Systemd Stop Signal
+STOPSIGNAL SIGRTMIN+3
+
+# El punto de entrada debe ser systemd para emular una máquina real
+CMD [ "/lib/systemd/systemd" ]
