@@ -18,7 +18,7 @@ services:
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       # Configuración del proveedor de Let's Encrypt (ACME)
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
-      - "--certificatesresolvers.myresolver.acme.email=[EMAIL_ADDRESS]" # <-- Cambia esto por tu correo real
+      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}"
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"

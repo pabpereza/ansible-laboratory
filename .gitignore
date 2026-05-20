@@ -1,0 +1,4 @@
+alumnos/
+traefik/letsencrypt/
+traefik/dynamic/
+traefik/.env

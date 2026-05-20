@@ -13,6 +13,13 @@ fi
 NUM_ALUMNOS=$1
 DOMINIO=$2
 
+# Pedir email para Let's Encrypt
+read -rp "Email para Let's Encrypt (ACME): " ACME_EMAIL
+if [ -z "$ACME_EMAIL" ]; then
+    echo "Error: el email no puede estar vacío."
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Iniciando la configuración del Laboratorio Ansible..."
@@ -57,6 +64,7 @@ echo ""
 
 # 3. Levantar Traefik (con las rutas ya generadas en dynamic/)
 echo "-> Levantando Traefik..."
+echo "ACME_EMAIL=$ACME_EMAIL" > "$SCRIPT_DIR/traefik/.env"
 docker compose -f "$SCRIPT_DIR/traefik/docker-compose.yml" up -d
 echo "   Traefik listo."
 
