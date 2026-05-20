@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile.target
     container_name: __ALUMNO_ID__-target1
     privileged: true
-    cgroupns_mode: host
+    cgroup: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - __ALUMNO_ID__-target1-docker:/var/lib/docker
@@ -52,7 +52,7 @@ services:
       dockerfile: Dockerfile.target
     container_name: __ALUMNO_ID__-target2
     privileged: true
-    cgroupns_mode: host
+    cgroup: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - __ALUMNO_ID__-target2-docker:/var/lib/docker
