@@ -15,37 +15,19 @@ Este repositorio contiene la infraestructura para desplegar un laboratorio de An
 - Docker y Docker Compose instalados en el VPS.
 - Dominio configurado apuntando a la IP del VPS mediante un registro A Wildcard (ej. `*.midominio.com -> <IP-VPS>`).
 
-### 2. Levantar el Proxy (Traefik)
-Traefik debe ejecutarse primero para crear la red global y estar listo para recibir peticiones.
+### 2. Desplegar el Laboratorio Completo
+El script `setup.sh` automatiza todo el proceso: crea la red de Traefik, levanta el proxy, genera los entornos de alumnos y los despliega.
 
 ```bash
-# Otorgar permisos de ejecución al script generador
+# Otorgar permisos de ejecución al script (solo la primera vez)
 chmod +x setup.sh
 
-# Levantar Traefik
-cd traefik
-docker network create proxy || true
-docker-compose up -d
-cd ..
-```
-
-### 3. Generar Entornos de Alumnos
-Ejecuta el script `setup.sh` indicando el número de alumnos y tu dominio.
-
-```bash
+# Ejecutar el script indicando número de alumnos y dominio
 ./setup.sh 15 midominio.com
 ```
-*Esto generará la carpeta `alumnos/` con 15 subcarpetas (alumno01 a alumno15), cada una con su respectivo `docker-compose.yml` y `Dockerfile.control`.*
+*El script generará la carpeta `alumnos/` con 15 subcarpetas (alumno01 a alumno15), cada una con su respectivo `docker-compose.yml` y Dockerfiles, y levantará todos los contenedores automáticamente.*
 
-### 4. Levantar Entornos de los Alumnos
-Puedes levantar todos los entornos de golpe usando este simple loop en bash:
-
-```bash
-for d in alumnos/*; do
-  (cd "$d" && docker-compose up -d)
-done
-```
-> **Nota**: Al ser un total de 45 contenedores (3 por alumno * 15 alumnos), tardará un poco en compilar las imágenes `control` de cada uno.
+> **Nota**: Al ser un total de 45 contenedores (3 por alumno × 15 alumnos), tardará varios minutos en compilar las imágenes.
 
 ### 5. Acceso para los Alumnos
 Cada alumno podrá acceder a su IDE web en su navegador:
@@ -60,7 +42,7 @@ Para limpiar completamente el laboratorio una vez finalizado el curso:
 ```bash
 # Apagar todos los entornos y borrar volúmenes
 for d in alumnos/*; do
-  (cd "$d" && docker-compose down -v)
+  (cd "$d" && docker compose down -v)
 done
 
 # Borrar carpetas de alumnos
@@ -68,6 +50,6 @@ rm -rf alumnos/
 
 # Apagar Traefik
 cd traefik
-docker-compose down -v
+docker compose down -v
 cd ..
 ```

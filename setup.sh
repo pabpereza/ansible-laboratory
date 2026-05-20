@@ -13,38 +13,61 @@ fi
 NUM_ALUMNOS=$1
 DOMINIO=$2
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "Iniciando la configuración del Laboratorio Ansible..."
+echo "  Alumnos : $NUM_ALUMNOS"
+echo "  Dominio : *.$DOMINIO"
+echo ""
 
 # 1. Crear red proxy de Traefik si no existe
-if ! docker network ls | grep -q "proxy"; then
+if ! docker network ls --format '{{.Name}}' | grep -q "^proxy$"; then
     echo "-> Creando la red global 'proxy' para Traefik..."
     docker network create proxy
 else
     echo "-> La red 'proxy' ya existe."
 fi
 
-# 2. Generar directorios para cada alumno
+# 2. Levantar Traefik
+echo "-> Levantando Traefik..."
+docker compose -f "$SCRIPT_DIR/traefik/docker-compose.yml" up -d
+echo "   Traefik listo."
+echo ""
+
+# 3. Generar directorios para cada alumno
 echo "-> Generando stacks para $NUM_ALUMNOS alumnos bajo el dominio *.$DOMINIO..."
 
 for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
     ALUMNO_ID="alumno$i"
-    ALUMNO_DIR="alumnos/$ALUMNO_ID"
-    
-    # Crear directorio base y subdirectorios necesarios
+    ALUMNO_DIR="$SCRIPT_DIR/alumnos/$ALUMNO_ID"
+
     mkdir -p "$ALUMNO_DIR/workspace"
-    
-    # Copiar los Dockerfiles (control y target)
-    cp templates/Dockerfile.control "$ALUMNO_DIR/Dockerfile.control"
-    cp templates/Dockerfile.target "$ALUMNO_DIR/Dockerfile.target"
-    
-    # Generar el docker-compose.yml del alumno sustituyendo las variables
+
+    cp "$SCRIPT_DIR/templates/Dockerfile.control" "$ALUMNO_DIR/Dockerfile.control"
+    cp "$SCRIPT_DIR/templates/Dockerfile.target"  "$ALUMNO_DIR/Dockerfile.target"
+
     sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" \
         -e "s/__DOMINIO__/$DOMINIO/g" \
-        templates/docker-compose.yml > "$ALUMNO_DIR/docker-compose.yml"
-        
-    echo "   - Creado entorno para $ALUMNO_ID en ./$ALUMNO_DIR"
+        "$SCRIPT_DIR/templates/docker-compose.yml" > "$ALUMNO_DIR/docker-compose.yml"
+
+    echo "   - Generado entorno para $ALUMNO_ID"
 done
 
 echo ""
-echo "¡Generación completada con éxito!"
-echo "Revisa el archivo README.md para ver las instrucciones de despliegue."
+
+# 4. Desplegar todos los entornos de alumnos
+echo "-> Desplegando entornos de alumnos (esto puede tardar varios minutos)..."
+
+for d in "$SCRIPT_DIR/alumnos"/*/; do
+    ALUMNO=$(basename "$d")
+    echo "   - Levantando $ALUMNO..."
+    docker compose -f "$d/docker-compose.yml" up -d --build
+done
+
+echo ""
+echo "¡Laboratorio desplegado con éxito!"
+echo ""
+echo "Acceso para los alumnos:"
+for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
+    echo "  https://alumno$i.$DOMINIO  (password: ansible)"
+done
