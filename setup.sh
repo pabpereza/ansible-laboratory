@@ -28,14 +28,10 @@ else
     echo "-> La red 'proxy' ya existe."
 fi
 
-# 2. Levantar Traefik
-echo "-> Levantando Traefik..."
-docker compose -f "$SCRIPT_DIR/traefik/docker-compose.yml" up -d
-echo "   Traefik listo."
-echo ""
-
-# 3. Generar directorios para cada alumno
+# 2. Generar directorios para cada alumno y rutas de Traefik
 echo "-> Generando stacks para $NUM_ALUMNOS alumnos bajo el dominio *.$DOMINIO..."
+
+mkdir -p "$SCRIPT_DIR/traefik/dynamic"
 
 for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
     ALUMNO_ID="alumno$i"
@@ -50,12 +46,23 @@ for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
         -e "s/__DOMINIO__/$DOMINIO/g" \
         "$SCRIPT_DIR/templates/docker-compose.yml" > "$ALUMNO_DIR/docker-compose.yml"
 
+    sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" \
+        -e "s/__DOMINIO__/$DOMINIO/g" \
+        "$SCRIPT_DIR/templates/traefik-route.yml" > "$SCRIPT_DIR/traefik/dynamic/$ALUMNO_ID.yml"
+
     echo "   - Generado entorno para $ALUMNO_ID"
 done
 
 echo ""
 
-# 4. Desplegar todos los entornos de alumnos
+# 3. Levantar Traefik (con las rutas ya generadas en dynamic/)
+echo "-> Levantando Traefik..."
+docker compose -f "$SCRIPT_DIR/traefik/docker-compose.yml" up -d
+echo "   Traefik listo."
+
+echo ""
+
+# 4. Desplegar todos los entornos de alumnos (después de Traefik para que la red proxy exista)
 echo "-> Desplegando entornos de alumnos (esto puede tardar varios minutos)..."
 
 for d in "$SCRIPT_DIR/alumnos"/*/; do

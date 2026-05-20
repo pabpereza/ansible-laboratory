@@ -20,13 +20,6 @@ services:
     networks:
       - __ALUMNO_ID__-net
       - proxy
-    labels:
-      # Configuración de Traefik
-      - "traefik.enable=true"
-      - "traefik.http.routers.__ALUMNO_ID__-control.rule=Host(`__ALUMNO_ID__.__DOMINIO__`)"
-      - "traefik.http.routers.__ALUMNO_ID__-control.entrypoints=websecure"
-      - "traefik.http.routers.__ALUMNO_ID__-control.tls.certresolver=myresolver"
-      - "traefik.http.services.__ALUMNO_ID__-control.loadbalancer.server.port=8443"
     restart: unless-stopped
 
   # ----------------------------------------------------

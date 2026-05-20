@@ -7,15 +7,15 @@ services:
     command:
       # Habilitar dashboard insecure en puerto 8080
       - "--api.insecure=true"
-      # Habilitar docker provider
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
+      # File provider: lee rutas de /etc/traefik/dynamic/ (generadas por setup.sh)
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       # Entrypoints (HTTP y HTTPS)
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       # Redirección global de HTTP a HTTPS
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       # Configuración del proveedor de Let's Encrypt (ACME)
       - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
       - "--certificatesresolvers.myresolver.acme.email=[EMAIL_ADDRESS]" # <-- Cambia esto por tu correo real
@@ -25,11 +25,9 @@ services:
       - "443:443"
       # Puerto para el dashboard de Traefik (http://<ip-del-vps>:8080)
       - "8080:8080"
-    environment:
-      - DOCKER_API_VERSION=1.41
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
+      - ./dynamic:/etc/traefik/dynamic
     networks:
       - proxy
     restart: unless-stopped
