@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   traefik:
-    image: traefik:v2.10
+    image: traefik:v3.3
     container_name: traefik
     command:
       # Habilitar dashboard insecure en puerto 8080
