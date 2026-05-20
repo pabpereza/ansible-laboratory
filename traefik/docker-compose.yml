@@ -25,6 +25,8 @@ services:
       - "443:443"
       # Puerto para el dashboard de Traefik (http://<ip-del-vps>:8080)
       - "8080:8080"
+    environment:
+      - DOCKER_API_VERSION=1.41
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
