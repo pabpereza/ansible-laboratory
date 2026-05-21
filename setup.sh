@@ -20,6 +20,21 @@ if [ -z "$ACME_EMAIL" ]; then
     exit 1
 fi
 
+# Pedir contraseña de acceso al Code-Server de cada alumno (sin eco para no dejarla en historial)
+while true; do
+    read -rsp "Contraseña de acceso al Code-Server (alumnos): " CODER_PASSWORD
+    echo
+    read -rsp "Confirma la contraseña: " CODER_PASSWORD_CONFIRM
+    echo
+    if [ -z "$CODER_PASSWORD" ]; then
+        echo "Error: la contraseña no puede estar vacía."
+    elif [ "$CODER_PASSWORD" = "$CODER_PASSWORD_CONFIRM" ]; then
+        break
+    else
+        echo "Error: las contraseñas no coinciden. Inténtalo de nuevo."
+    fi
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Iniciando la configuración del Laboratorio Ansible..."
@@ -53,6 +68,8 @@ for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
         -e "s/__DOMINIO__/$DOMINIO/g" \
         "$SCRIPT_DIR/templates/docker-compose.yml" > "$ALUMNO_DIR/docker-compose.yml"
 
+    printf 'CODER_PASSWORD=%s\n' "$CODER_PASSWORD" > "$ALUMNO_DIR/.env"
+
     sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" \
         -e "s/__DOMINIO__/$DOMINIO/g" \
         "$SCRIPT_DIR/templates/traefik-route.yml" > "$SCRIPT_DIR/traefik/dynamic/$ALUMNO_ID.yml"
@@ -84,5 +101,7 @@ echo "¡Laboratorio desplegado con éxito!"
 echo ""
 echo "Acceso para los alumnos:"
 for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
-    echo "  https://alumno$i.$DOMINIO  (password: ansible)"
+    echo "  https://alumno$i.$DOMINIO"
 done
+echo ""
+echo "La contraseña de acceso es la que introdujiste durante la instalación."

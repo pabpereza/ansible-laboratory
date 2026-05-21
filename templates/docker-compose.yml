@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ----------------------------------------------------
   # Control Node (Web IDE: Code-Server)
@@ -13,8 +11,8 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid
-      - PASSWORD=ansible # Contraseña para entrar al Code-Server web
-      - SUDO_PASSWORD=ansible # Contraseña sudo dentro del contenedor
+      - PASSWORD=${CODER_PASSWORD}
+      - SUDO_PASSWORD=${CODER_PASSWORD}
     volumes:
       - ./workspace:/config/workspace
     networks:

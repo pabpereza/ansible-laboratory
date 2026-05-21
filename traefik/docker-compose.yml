@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   traefik:
     image: traefik:v3.3
@@ -23,8 +21,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      # Puerto para el dashboard de Traefik (http://<ip-del-vps>:8080)
-      - "8080:8080"
+      # Dashboard solo accesible desde localhost (ssh -L 8080:localhost:8080 usuario@vps)
+      - "127.0.0.1:8080:8080"
     volumes:
       - ./letsencrypt:/letsencrypt
       - ./dynamic:/etc/traefik/dynamic
