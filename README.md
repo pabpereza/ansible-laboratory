@@ -1,55 +1,93 @@
 # Laboratorio de Ansible
 
-Este repositorio contiene la infraestructura para desplegar un laboratorio de Ansible para múltiples alumnos en un único VPS utilizando contenedores Docker. 
+Infraestructura para desplegar un laboratorio de Ansible para múltiples alumnos en un único VPS o en local, usando contenedores Docker.
 
 ## Arquitectura
 
-- **Traefik**: Proxy inverso global encargado de rutear `alumnoXX.dominio.com` al contenedor Code-Server (IDE) correcto.
-- **Entorno por Alumno**:
-  - `control`: IDE Web (linuxserver/code-server) con `ansible`, `sshpass` y herramientas instaladas.
-  - `target1` y `target2`: Contenedores Ubuntu preparados para correr Ansible, con soporte para `systemd` y Docker-in-Docker (DinD).
+- **Traefik** *(solo modo VPS/Cloud)*: Proxy inverso que enruta `alumnoXX.dominio.com` al contenedor Code-Server correcto y gestiona certificados SSL via Let's Encrypt.
+- **Entorno por alumno**:
+  - `control`: IDE web (VS Code via code-server) con `ansible`, `sshpass` y herramientas instaladas. Opcional en modo local.
+  - `target1` y `target2`: Contenedores Debian preparados para ejecutar Ansible, con soporte para `systemd` y Docker-in-Docker (DinD).
 
-## Despliegue del Laboratorio
+## Modos de despliegue
 
-### 1. Requisitos Previos
-- Docker y Docker Compose instalados en el VPS.
-- Dominio configurado apuntando a la IP del VPS mediante un registro A Wildcard (ej. `*.midominio.com -> <IP-VPS>`).
+### Modo VPS / Cloud
+Pensado para un servidor remoto con un dominio wildcard apuntando a su IP. Traefik expone cada entorno en `alumnoXX.dominio.com` con HTTPS (opcional).
 
-### 2. Desplegar el Laboratorio Completo
-El script `setup.sh` automatiza todo el proceso: crea la red de Traefik, levanta el proxy, genera los entornos de alumnos y los despliega.
+### Modo local
+Pensado para pruebas en tu propia máquina. No requiere dominio ni Traefik. El nodo de control (code-server) es opcional: puedes usar tu propio editor y conectarte por SSH a los nodos target usando las IPs de los contenedores.
+
+> **DNS local**: Docker no ofrece resolución de nombres de contenedores desde el host. Usa las IPs que muestra el instalador al terminar, o añade entradas a `/etc/hosts` manualmente.
+
+## Instalación
+
+### Requisitos previos
+- Docker y Docker Compose instalados.
+- *(Solo modo VPS)* Dominio con registro A Wildcard apuntando a la IP del servidor (ej. `*.midominio.com → <IP>`).
+
+### Ejecutar el instalador
 
 ```bash
-# Otorgar permisos de ejecución al script (solo la primera vez)
 chmod +x setup.sh
-
-# Ejecutar el script indicando número de alumnos y dominio
-./setup.sh 15 midominio.com
+./setup.sh
 ```
-*El script generará la carpeta `alumnos/` con 15 subcarpetas (alumno01 a alumno15), cada una con su respectivo `docker-compose.yml` y Dockerfiles, y levantará todos los contenedores automáticamente.*
 
-> **Nota**: Al ser un total de 45 contenedores (3 por alumno × 15 alumnos), tardará varios minutos en compilar las imágenes.
+El instalador es completamente interactivo y guiará por los siguientes pasos:
 
-### 5. Acceso para los Alumnos
-Cada alumno podrá acceder a su IDE web en su navegador:
-- **URL**: `http://alumno01.midominio.com` (Sustituir 01 por su número)
-- **Password Code-Server**: `ansible` (configurable en el archivo `templates/docker-compose.yml`)
+```
+¿Dónde vas a desplegar el laboratorio?
+  1) Local (tu propia máquina)
+  2) VPS / Cloud (servidor con dominio)
 
-Desde la terminal del Code-Server, podrán probar la conexión SSH o Ansible contra sus target nodes (`alumno01-target1` y `alumno01-target2`).
+Número de alumnos: ...
 
-## Destruir el Laboratorio
-Para limpiar completamente el laboratorio una vez finalizado el curso:
+# Si es VPS/Cloud:
+  Dominio base: ...
+  ¿Habilitar SSL con Let's Encrypt? → email ACME
+  Contraseña de acceso al Code-Server (con confirmación, sin eco)
+
+# Si es local:
+  ¿Desplegar nodo de control (code-server)?
+  → Si sí: contraseña de acceso (con confirmación, sin eco)
+```
+
+Al final muestra un resumen y pide confirmación antes de ejecutar.
+
+### Acceso tras la instalación
+
+**Modo VPS/Cloud:**
+```
+https://alumno01.midominio.com   ← con SSL
+http://alumno01.midominio.com    ← sin SSL
+```
+La contraseña es la introducida durante la instalación.
+
+**Modo local:**
+```
+IPs de los contenedores:
+  alumno01 → control: https://172.x.x.x:8443 | target1: 172.x.x.x | target2: 172.x.x.x
+```
+
+## Dashboard de Traefik *(solo modo VPS/Cloud)*
+
+El dashboard está disponible únicamente en `localhost:8080` del servidor (no expuesto al exterior). Accede mediante un túnel SSH desde tu máquina:
 
 ```bash
-# Apagar todos los entornos y borrar volúmenes
-for d in alumnos/*; do
-  (cd "$d" && docker compose down -v)
+ssh -L 8080:localhost:8080 usuario@ip-del-vps
+# Luego abre: http://localhost:8080/dashboard/
+```
+
+## Destruir el laboratorio
+
+```bash
+# Apagar y borrar volúmenes de todos los alumnos
+for d in alumnos/*/; do
+  docker compose -f "$d/docker-compose.yml" down -v
 done
 
-# Borrar carpetas de alumnos
+# Borrar carpetas generadas
 rm -rf alumnos/
 
-# Apagar Traefik
-cd traefik
-docker compose down -v
-cd ..
+# Apagar Traefik (solo modo VPS/Cloud)
+docker compose -f traefik/docker-compose.yml down -v
 ```

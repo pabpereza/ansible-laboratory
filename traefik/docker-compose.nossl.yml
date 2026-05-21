@@ -1,0 +1,22 @@
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./dynamic:/etc/traefik/dynamic
+    networks:
+      - proxy
+    restart: unless-stopped
+
+networks:
+  proxy:
+    name: proxy
+    external: true

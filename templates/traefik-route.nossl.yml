@@ -1,0 +1,13 @@
+http:
+  routers:
+    __ALUMNO_ID__:
+      rule: "Host(`__ALUMNO_ID__.__DOMINIO__`)"
+      entryPoints:
+        - web
+      service: __ALUMNO_ID__-svc
+
+  services:
+    __ALUMNO_ID__-svc:
+      loadBalancer:
+        servers:
+          - url: "http://__ALUMNO_ID__-control:8443"

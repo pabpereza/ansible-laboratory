@@ -1,0 +1,64 @@
+services:
+  # ----------------------------------------------------
+  # Control Node (Web IDE: Code-Server) — opcional
+  # Actívalo con: docker compose --profile control up
+  # ----------------------------------------------------
+  control:
+    profiles:
+      - control
+    build:
+      context: .
+      dockerfile: Dockerfile.control
+    container_name: __ALUMNO_ID__-control
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - PASSWORD=${CODER_PASSWORD}
+      - SUDO_PASSWORD=${CODER_PASSWORD}
+    volumes:
+      - ./workspace:/config/workspace
+    networks:
+      - __ALUMNO_ID__-net
+    restart: unless-stopped
+
+  # ----------------------------------------------------
+  # Target Node 1 (Debian with systemd + DinD + SSH)
+  # ----------------------------------------------------
+  target1:
+    build:
+      context: .
+      dockerfile: Dockerfile.target
+    container_name: __ALUMNO_ID__-target1
+    privileged: true
+    cgroup: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - __ALUMNO_ID__-target1-docker:/var/lib/docker
+    networks:
+      - __ALUMNO_ID__-net
+    command: /lib/systemd/systemd
+    restart: unless-stopped
+
+  target2:
+    build:
+      context: .
+      dockerfile: Dockerfile.target
+    container_name: __ALUMNO_ID__-target2
+    privileged: true
+    cgroup: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - __ALUMNO_ID__-target2-docker:/var/lib/docker
+    networks:
+      - __ALUMNO_ID__-net
+    command: /lib/systemd/systemd
+    restart: unless-stopped
+
+networks:
+  __ALUMNO_ID__-net:
+    name: __ALUMNO_ID__-net
+
+volumes:
+  __ALUMNO_ID__-target1-docker:
+  __ALUMNO_ID__-target2-docker:
