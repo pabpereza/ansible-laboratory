@@ -10,6 +10,101 @@ echo "  Laboratorio Ansible - Configuración"
 echo "============================================"
 echo ""
 
+# ==============================================================
+# DETECCIÓN DE INSTALACIÓN EXISTENTE
+# ==============================================================
+if [ -d "$SCRIPT_DIR/alumnos" ] && [ "$(ls -A "$SCRIPT_DIR/alumnos" 2>/dev/null)" ]; then
+
+    # Detectar modo anterior
+    if ls "$SCRIPT_DIR/traefik/dynamic/"*.yml &>/dev/null; then
+        _PREV_MODE="server"
+    else
+        _PREV_MODE="local"
+    fi
+
+    echo "Se ha detectado un laboratorio ya desplegado (modo: $_PREV_MODE)."
+    echo ""
+    echo "¿Qué deseas hacer?"
+    echo "  1) Relanzar  (volver a levantar todos los contenedores sin reconfigurar)"
+    echo "  2) Desinstalar (borrar todos los contenedores, volúmenes y ficheros generados)"
+    echo "  3) Reinstalar  (nueva configuración, sobreescribe la actual)"
+    echo ""
+    read -rp "Selecciona [1/2/3]: " _EXISTING_ACTION
+
+    # --- RELANZAR ---
+    if [[ "$_EXISTING_ACTION" == "1" ]]; then
+        echo ""
+
+        if [[ "$_PREV_MODE" == "server" ]]; then
+            # Detectar si se usó SSL (existe acme.json)
+            if [ -f "$SCRIPT_DIR/traefik/letsencrypt/acme.json" ]; then
+                _TRAEFIK_COMPOSE="$SCRIPT_DIR/traefik/docker-compose.yml"
+            else
+                _TRAEFIK_COMPOSE="$SCRIPT_DIR/traefik/docker-compose.nossl.yml"
+            fi
+            echo "-> Relanzando Traefik..."
+            docker compose -f "$_TRAEFIK_COMPOSE" up -d
+            echo "   Listo."
+            echo ""
+        fi
+
+        # Detectar si hay nodos control (para --profile en modo local)
+        _HAS_CONTROL=$(docker ps -a --filter "name=-control" --format "{{.Names}}" | head -1)
+
+        echo "-> Relanzando entornos de alumnos..."
+        for d in "$SCRIPT_DIR/alumnos"/*/; do
+            echo "   - $(basename "$d")"
+            if [[ "$_PREV_MODE" == "local" && -n "$_HAS_CONTROL" ]]; then
+                docker compose -f "$d/docker-compose.yml" --profile control up -d
+            else
+                docker compose -f "$d/docker-compose.yml" up -d
+            fi
+        done
+
+        echo ""
+        echo "¡Laboratorio relanzado con éxito!"
+        exit 0
+
+    # --- DESINSTALAR ---
+    elif [[ "$_EXISTING_ACTION" == "2" ]]; then
+        echo ""
+        read -rp "¿Seguro? Se borrarán todos los contenedores y volúmenes. [s/N]: " _CONFIRM_UNINSTALL
+        [[ ! "$_CONFIRM_UNINSTALL" =~ ^[sS]$ ]] && { echo "Cancelado."; exit 0; }
+
+        echo ""
+        echo "-> Eliminando entornos de alumnos..."
+        for d in "$SCRIPT_DIR/alumnos"/*/; do
+            echo "   - $(basename "$d")"
+            docker compose -f "$d/docker-compose.yml" --profile control down -v 2>/dev/null || \
+            docker compose -f "$d/docker-compose.yml" down -v 2>/dev/null || true
+        done
+
+        if [[ "$_PREV_MODE" == "server" ]]; then
+            echo ""
+            echo "-> Eliminando Traefik..."
+            docker compose -f "$SCRIPT_DIR/traefik/docker-compose.yml" down -v 2>/dev/null || \
+            docker compose -f "$SCRIPT_DIR/traefik/docker-compose.nossl.yml" down -v 2>/dev/null || true
+            rm -f "$SCRIPT_DIR/traefik/dynamic/"*.yml
+            echo "   Listo."
+        fi
+
+        echo ""
+        echo "-> Borrando ficheros generados..."
+        rm -rf "$SCRIPT_DIR/alumnos"
+        echo ""
+        echo "Laboratorio desinstalado correctamente."
+        exit 0
+
+    # --- REINSTALAR: continúa con el flujo normal ---
+    elif [[ "$_EXISTING_ACTION" == "3" ]]; then
+        echo ""
+        echo "Continuando con la nueva instalación..."
+        echo ""
+    else
+        echo "Opción no válida."; exit 1
+    fi
+fi
+
 # 1. Modo de despliegue
 echo "¿Dónde vas a desplegar el laboratorio?"
 echo "  1) Local (tu propia máquina)"
