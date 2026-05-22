@@ -21,3 +21,7 @@ RUN apt-get update && \
 # Configuración opcional por defecto para ansible (para ignorar host key checking en el laboratorio)
 RUN mkdir -p /etc/ansible && \
     echo "[defaults]\nhost_key_checking = False" > /etc/ansible/ansible.cfg
+
+# Tema oscuro por defecto en code-server
+RUN mkdir -p /config/data/User && \
+    echo '{"workbench.colorTheme": "Default Dark+"}' > /config/data/User/settings.json
