@@ -7,7 +7,7 @@ Infraestructura para desplegar un laboratorio de Ansible para múltiples alumnos
 - **Traefik** *(solo modo VPS/Cloud)*: Proxy inverso que enruta `alumnoXX.dominio.com` al contenedor Code-Server correcto y gestiona certificados SSL via Let's Encrypt.
 - **Entorno por alumno**:
   - `control`: IDE web (VS Code via code-server) con `ansible`, `sshpass` y herramientas instaladas. Opcional en modo local.
-  - `target1` y `target2`: Contenedores Debian preparados para ejecutar Ansible, con soporte para `systemd` y Docker-in-Docker (DinD).
+  - `targetN`: N contenedores Debian (configurable en la instalación) preparados para ejecutar Ansible, con soporte para `systemd` y Docker-in-Docker (DinD).
 
 ## Modos de despliegue
 

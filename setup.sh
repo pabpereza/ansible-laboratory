@@ -4,6 +4,113 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# ==============================================================
+# FUNCIÓN: genera el docker-compose.yml de un alumno
+# Uso: generate_compose <alumno_id> <num_targets> <server|local>
+# ==============================================================
+generate_compose() {
+    local ALUMNO_ID="$1"
+    local NUM_TARGETS="$2"
+    local COMPOSE_MODE="$3"  # server | local
+
+    # --- Cabecera y nodo control ---
+    if [[ "$COMPOSE_MODE" == "server" ]]; then
+        cat <<EOF
+services:
+  control:
+    build:
+      context: .
+      dockerfile: Dockerfile.control
+    container_name: ${ALUMNO_ID}-control
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - PASSWORD=\${CODER_PASSWORD}
+      - SUDO_PASSWORD=\${CODER_PASSWORD}
+    volumes:
+      - ./workspace:/config/workspace
+    networks:
+      - ${ALUMNO_ID}-net
+      - proxy
+    restart: unless-stopped
+
+EOF
+    else
+        cat <<EOF
+services:
+  control:
+    profiles:
+      - control
+    build:
+      context: .
+      dockerfile: Dockerfile.control
+    container_name: ${ALUMNO_ID}-control
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - PASSWORD=\${CODER_PASSWORD}
+      - SUDO_PASSWORD=\${CODER_PASSWORD}
+    volumes:
+      - ./workspace:/config/workspace
+    networks:
+      - ${ALUMNO_ID}-net
+    restart: unless-stopped
+
+EOF
+    fi
+
+    # --- N nodos target ---
+    for j in $(seq 1 "$NUM_TARGETS"); do
+        cat <<EOF
+  target${j}:
+    build:
+      context: .
+      dockerfile: Dockerfile.target
+    container_name: ${ALUMNO_ID}-target${j}
+    privileged: true
+    cgroup: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - ${ALUMNO_ID}-target${j}-docker:/var/lib/docker
+    networks:
+      - ${ALUMNO_ID}-net
+    command: /lib/systemd/systemd
+    restart: unless-stopped
+
+EOF
+    done
+
+    # --- Redes ---
+    if [[ "$COMPOSE_MODE" == "server" ]]; then
+        cat <<EOF
+networks:
+  ${ALUMNO_ID}-net:
+    name: ${ALUMNO_ID}-net
+  proxy:
+    external: true
+
+EOF
+    else
+        cat <<EOF
+networks:
+  ${ALUMNO_ID}-net:
+    name: ${ALUMNO_ID}-net
+
+EOF
+    fi
+
+    # --- Volúmenes ---
+    echo "volumes:"
+    for j in $(seq 1 "$NUM_TARGETS"); do
+        echo "  ${ALUMNO_ID}-target${j}-docker:"
+    done
+}
+
+# ==============================================================
+# CABECERA
+# ==============================================================
 echo ""
 echo "============================================"
 echo "  Laboratorio Ansible - Configuración"
@@ -15,7 +122,6 @@ echo ""
 # ==============================================================
 if [ -d "$SCRIPT_DIR/alumnos" ] && [ "$(ls -A "$SCRIPT_DIR/alumnos" 2>/dev/null)" ]; then
 
-    # Detectar modo anterior
     if ls "$SCRIPT_DIR/traefik/dynamic/"*.yml &>/dev/null; then
         _PREV_MODE="server"
     else
@@ -25,7 +131,7 @@ if [ -d "$SCRIPT_DIR/alumnos" ] && [ "$(ls -A "$SCRIPT_DIR/alumnos" 2>/dev/null)
     echo "Se ha detectado un laboratorio ya desplegado (modo: $_PREV_MODE)."
     echo ""
     echo "¿Qué deseas hacer?"
-    echo "  1) Relanzar  (volver a levantar todos los contenedores sin reconfigurar)"
+    echo "  1) Relanzar   (volver a levantar todos los contenedores sin reconfigurar)"
     echo "  2) Desinstalar (borrar todos los contenedores, volúmenes y ficheros generados)"
     echo "  3) Reinstalar  (nueva configuración, sobreescribe la actual)"
     echo ""
@@ -36,7 +142,6 @@ if [ -d "$SCRIPT_DIR/alumnos" ] && [ "$(ls -A "$SCRIPT_DIR/alumnos" 2>/dev/null)
         echo ""
 
         if [[ "$_PREV_MODE" == "server" ]]; then
-            # Detectar si se usó SSL (existe acme.json)
             if [ -f "$SCRIPT_DIR/traefik/letsencrypt/acme.json" ]; then
                 _TRAEFIK_COMPOSE="$SCRIPT_DIR/traefik/docker-compose.yml"
             else
@@ -48,7 +153,6 @@ if [ -d "$SCRIPT_DIR/alumnos" ] && [ "$(ls -A "$SCRIPT_DIR/alumnos" 2>/dev/null)
             echo ""
         fi
 
-        # Detectar si hay nodos control (para --profile en modo local)
         _HAS_CONTROL=$(docker ps -a --filter "name=-control" --format "{{.Names}}" | head -1)
 
         echo "-> Relanzando entornos de alumnos..."
@@ -105,6 +209,10 @@ if [ -d "$SCRIPT_DIR/alumnos" ] && [ "$(ls -A "$SCRIPT_DIR/alumnos" 2>/dev/null)
     fi
 fi
 
+# ==============================================================
+# CONFIGURACIÓN INTERACTIVA
+# ==============================================================
+
 # 1. Modo de despliegue
 echo "¿Dónde vas a desplegar el laboratorio?"
 echo "  1) Local (tu propia máquina)"
@@ -125,14 +233,22 @@ if ! [[ "$NUM_ALUMNOS" =~ ^[0-9]+$ ]] || [ "$NUM_ALUMNOS" -lt 1 ]; then
     exit 1
 fi
 
+# 3. Número de nodos target por alumno
+echo ""
+read -rp "Número de nodos target por alumno: " NUM_TARGETS
+if ! [[ "$NUM_TARGETS" =~ ^[0-9]+$ ]] || [ "$NUM_TARGETS" -lt 1 ]; then
+    echo "Error: debe ser un número entero mayor que 0."
+    exit 1
+fi
+
 if [[ "$MODE" == "server" ]]; then
 
-    # 3. Dominio
+    # 4. Dominio
     echo ""
     read -rp "Dominio base (ej: midominio.com): " DOMINIO
     [ -z "$DOMINIO" ] && { echo "Error: el dominio no puede estar vacío."; exit 1; }
 
-    # 4. SSL
+    # 5. SSL
     echo ""
     read -rp "¿Habilitar SSL automático con Let's Encrypt? [S/n]: " _SSL
     if [[ "$_SSL" =~ ^[nN]$ ]]; then
@@ -143,7 +259,7 @@ if [[ "$MODE" == "server" ]]; then
         [ -z "$ACME_EMAIL" ] && { echo "Error: el email no puede estar vacío."; exit 1; }
     fi
 
-    # 5. Contraseña code-server (cloud siempre despliega control)
+    # 6. Contraseña code-server
     DEPLOY_CONTROL=true
     echo ""
     echo "Contraseña de acceso al Code-Server para los alumnos:"
@@ -161,7 +277,7 @@ if [[ "$MODE" == "server" ]]; then
 
 else
 
-    # 3. Nodo de control
+    # 4. Nodo de control
     echo ""
     echo "El nodo de control es un VS Code web (code-server) accesible desde el navegador."
     echo "Puedes omitirlo y usar tu propio editor, conectándote por SSH a los nodos target."
@@ -194,6 +310,7 @@ echo "--------------------------------------------"
 echo "  Resumen:"
 echo "  Modo    : $MODE"
 echo "  Alumnos : $NUM_ALUMNOS"
+echo "  Targets : $NUM_TARGETS por alumno"
 if [[ "$MODE" == "server" ]]; then
     echo "  Dominio : *.$DOMINIO"
     [[ "$USE_SSL" == "true" ]] && echo "  SSL     : sí (Let's Encrypt)" || echo "  SSL     : no"
@@ -221,7 +338,7 @@ if [[ "$MODE" == "server" ]]; then
     fi
 
     # 2. Generar stacks de alumnos
-    echo "-> Generando stacks para $NUM_ALUMNOS alumnos..."
+    echo "-> Generando stacks para $NUM_ALUMNOS alumnos ($NUM_TARGETS targets cada uno)..."
     mkdir -p "$SCRIPT_DIR/traefik/dynamic"
 
     if [[ "$USE_SSL" == "true" ]]; then
@@ -238,9 +355,7 @@ if [[ "$MODE" == "server" ]]; then
         cp "$SCRIPT_DIR/templates/Dockerfile.control" "$ALUMNO_DIR/Dockerfile.control"
         cp "$SCRIPT_DIR/templates/Dockerfile.target"  "$ALUMNO_DIR/Dockerfile.target"
 
-        sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" \
-            -e "s/__DOMINIO__/$DOMINIO/g" \
-            "$SCRIPT_DIR/templates/docker-compose.yml" > "$ALUMNO_DIR/docker-compose.yml"
+        generate_compose "$ALUMNO_ID" "$NUM_TARGETS" "server" > "$ALUMNO_DIR/docker-compose.yml"
 
         printf 'CODER_PASSWORD=%s\n' "$CODER_PASSWORD" > "$ALUMNO_DIR/.env"
 
@@ -287,7 +402,7 @@ if [[ "$MODE" == "server" ]]; then
 else
 
     # 1. Generar stacks de alumnos
-    echo "-> Generando stacks para $NUM_ALUMNOS alumnos (modo local)..."
+    echo "-> Generando stacks para $NUM_ALUMNOS alumnos ($NUM_TARGETS targets cada uno)..."
 
     for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
         ALUMNO_ID="alumno$i"
@@ -297,8 +412,7 @@ else
         cp "$SCRIPT_DIR/templates/Dockerfile.control" "$ALUMNO_DIR/Dockerfile.control"
         cp "$SCRIPT_DIR/templates/Dockerfile.target"  "$ALUMNO_DIR/Dockerfile.target"
 
-        sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" \
-            "$SCRIPT_DIR/templates/docker-compose.local.yml" > "$ALUMNO_DIR/docker-compose.yml"
+        generate_compose "$ALUMNO_ID" "$NUM_TARGETS" "local" > "$ALUMNO_DIR/docker-compose.yml"
 
         if [[ "$DEPLOY_CONTROL" == "true" ]]; then
             printf 'CODER_PASSWORD=%s\n' "$CODER_PASSWORD" > "$ALUMNO_DIR/.env"
@@ -326,14 +440,16 @@ else
     for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
         ALUMNO_ID="alumno$i"
         NET="${ALUMNO_ID}-net"
-        IP_T1=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "${ALUMNO_ID}-target1" 2>/dev/null || echo "N/A")
-        IP_T2=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "${ALUMNO_ID}-target2" 2>/dev/null || echo "N/A")
+        LINE="  $ALUMNO_ID →"
         if [[ "$DEPLOY_CONTROL" == "true" ]]; then
             IP_C=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "${ALUMNO_ID}-control" 2>/dev/null || echo "N/A")
-            echo "  $ALUMNO_ID → control: https://$IP_C:8443 | target1: $IP_T1 | target2: $IP_T2"
-        else
-            echo "  $ALUMNO_ID → target1: $IP_T1 | target2: $IP_T2"
+            LINE="$LINE control: https://$IP_C:8443"
         fi
+        for j in $(seq 1 "$NUM_TARGETS"); do
+            IP_T=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "${ALUMNO_ID}-target${j}" 2>/dev/null || echo "N/A")
+            LINE="$LINE | target${j}: $IP_T"
+        done
+        echo "$LINE"
     done
     echo ""
     echo "Nota: Docker no ofrece DNS del host hacia los contenedores. Usa las IPs"
