@@ -29,7 +29,10 @@ RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
     /lib/systemd/system/systemd-update-utmp*
 
 # Configurar SSH para permitir root y conexiones estándar
-RUN mkdir /var/run/sshd && \
+# ssh-keygen -A genera las host keys en build-time para que sshd arranque sin depender
+# de la unidad de generación de claves (que puede estar deshabilitada tras el cleanup)
+RUN mkdir -p /var/run/sshd && \
+    ssh-keygen -A && \
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
 # Crear un usuario "ansible" con contraseña "ansible" y privilegios sudo sin contraseña

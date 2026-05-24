@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ==============================================================
 # FUNCIÓN: genera el docker-compose.yml de un alumno
+# Lee las plantillas en templates/ y duplica el bloque target N veces.
 # Uso: generate_compose <alumno_id> <num_targets> <server|local>
 # ==============================================================
 generate_compose() {
@@ -13,98 +14,39 @@ generate_compose() {
     local NUM_TARGETS="$2"
     local COMPOSE_MODE="$3"  # server | local
 
-    # --- Cabecera y nodo control ---
+    local TEMPLATE
     if [[ "$COMPOSE_MODE" == "server" ]]; then
-        cat <<EOF
-services:
-  control:
-    build:
-      context: .
-      dockerfile: Dockerfile.control
-    container_name: ${ALUMNO_ID}-control
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Madrid
-      - PASSWORD=\${CODER_PASSWORD}
-      - SUDO_PASSWORD=\${CODER_PASSWORD}
-    volumes:
-      - ./workspace:/config/workspace
-    networks:
-      - ${ALUMNO_ID}-net
-      - proxy
-    restart: unless-stopped
-
-EOF
+        TEMPLATE="$SCRIPT_DIR/templates/docker-compose.yml"
     else
-        cat <<EOF
-services:
-  control:
-    profiles:
-      - control
-    build:
-      context: .
-      dockerfile: Dockerfile.control
-    container_name: ${ALUMNO_ID}-control
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Madrid
-      - PASSWORD=\${CODER_PASSWORD}
-      - SUDO_PASSWORD=\${CODER_PASSWORD}
-    volumes:
-      - ./workspace:/config/workspace
-    networks:
-      - ${ALUMNO_ID}-net
-    restart: unless-stopped
-
-EOF
+        TEMPLATE="$SCRIPT_DIR/templates/docker-compose.local.yml"
     fi
 
-    # --- N nodos target ---
-    for j in $(seq 1 "$NUM_TARGETS"); do
-        cat <<EOF
-  target${j}:
-    build:
-      context: .
-      dockerfile: Dockerfile.target
-    container_name: ${ALUMNO_ID}-target${j}
-    privileged: true
-    cgroup: host
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-      - ${ALUMNO_ID}-target${j}-docker:/var/lib/docker
-    networks:
-      - ${ALUMNO_ID}-net
-    command: /lib/systemd/systemd
-    restart: unless-stopped
+    # 1. Cabecera + nodo control (todo antes de # __TARGET_START__)
+    awk '/^# __TARGET_START__$/{exit} {print}' "$TEMPLATE" \
+        | sed "s/__ALUMNO_ID__/$ALUMNO_ID/g"
 
-EOF
+    # 2. Extraer bloque target de la plantilla (entre marcadores, sin ellos)
+    local TARGET_BLOCK
+    TARGET_BLOCK=$(awk '/^# __TARGET_START__$/,/^# __TARGET_END__$/{
+        if (!/^# __TARGET_START__$/ && !/^# __TARGET_END__$/) print
+    }' "$TEMPLATE")
+
+    # 3. Generar N servicios target
+    for j in $(seq 1 "$NUM_TARGETS"); do
+        printf '%s\n' "$TARGET_BLOCK" \
+            | sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" -e "s/__TARGET_N__/$j/g"
     done
 
-    # --- Redes ---
-    if [[ "$COMPOSE_MODE" == "server" ]]; then
-        cat <<EOF
-networks:
-  ${ALUMNO_ID}-net:
-    name: ${ALUMNO_ID}-net
-  proxy:
-    external: true
+    # 4. Sección networks (entre # __TARGET_END__ y volumes:, exclusive)
+    awk '/^# __TARGET_END__$/,/^volumes:$/{
+        if (!/^# __TARGET_END__$/ && !/^volumes:$/) print
+    }' "$TEMPLATE" \
+        | sed "s/__ALUMNO_ID__/$ALUMNO_ID/g"
 
-EOF
-    else
-        cat <<EOF
-networks:
-  ${ALUMNO_ID}-net:
-    name: ${ALUMNO_ID}-net
-
-EOF
-    fi
-
-    # --- Volúmenes ---
-    echo "volumes:"
+    # 5. Volúmenes generados dinámicamente
+    printf 'volumes:\n'
     for j in $(seq 1 "$NUM_TARGETS"); do
-        echo "  ${ALUMNO_ID}-target${j}-docker:"
+        printf '  %s-target%s-docker:\n' "$ALUMNO_ID" "$j"
     done
 }
 

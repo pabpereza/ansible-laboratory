@@ -20,38 +20,27 @@ services:
       - proxy
     restart: unless-stopped
 
+# __TARGET_START__
   # ----------------------------------------------------
-  # Target Node 1 (Debian with systemd + DinD + SSH)
+  # Target Node __TARGET_N__ (Debian with systemd + DinD + SSH)
+  # setup.sh duplica este bloque sustituyendo __TARGET_N__ por 1..N
   # ----------------------------------------------------
-  target1:
+  target__TARGET_N__:
     build:
       context: .
       dockerfile: Dockerfile.target
-    container_name: __ALUMNO_ID__-target1
+    container_name: __ALUMNO_ID__-target__TARGET_N__
     privileged: true
     cgroup: host
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
-      - __ALUMNO_ID__-target1-docker:/var/lib/docker
-    networks:
-      - __ALUMNO_ID__-net
-    command: /lib/systemd/systemd
-    restart: unless-stopped
-  target2:
-    build:
-      context: .
-      dockerfile: Dockerfile.target
-    container_name: __ALUMNO_ID__-target2
-    privileged: true
-    cgroup: host
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-      - __ALUMNO_ID__-target2-docker:/var/lib/docker
+      - __ALUMNO_ID__-target__TARGET_N__-docker:/var/lib/docker
     networks:
       - __ALUMNO_ID__-net
     command: /lib/systemd/systemd
     restart: unless-stopped
 
+# __TARGET_END__
 networks:
   __ALUMNO_ID__-net:
     name: __ALUMNO_ID__-net
@@ -59,6 +48,3 @@ networks:
     external: true
 
 volumes:
-  # Volúmenes dedicados para Docker in Docker (evita problemas con OverlayFS)
-  __ALUMNO_ID__-target1-docker:
-  __ALUMNO_ID__-target2-docker:

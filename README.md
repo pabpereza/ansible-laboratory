@@ -2,6 +2,16 @@
 
 Infraestructura para desplegar un laboratorio de Ansible para múltiples alumnos en un único VPS o en local, usando contenedores Docker.
 
+> [!WARNING]
+> **Entorno inseguro por diseño.**
+> Para simplificar la puesta a punto de una infraestructura compleja de aprendizaje, los contenedores target se ejecutan con configuraciones deliberadamente inseguras:
+> - Modo `privileged` activo (acceso total al kernel del host).
+> - `cgroup: host` compartido entre contenedor y host.
+> - Volumen `/sys/fs/cgroup` montado en modo escritura.
+> - Docker-in-Docker (DinD) habilitado.
+>
+> **No uses este laboratorio en producción ni expongas los contenedores a internet sin un control de acceso adicional.**
+
 ## Arquitectura
 
 - **Traefik** *(solo modo VPS/Cloud)*: Proxy inverso que enruta `alumnoXX.dominio.com` al contenedor Code-Server correcto y gestiona certificados SSL via Let's Encrypt.
