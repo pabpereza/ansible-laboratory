@@ -378,22 +378,30 @@ else
     echo ""
     echo "¡Laboratorio desplegado con éxito!"
     echo ""
-    echo "IPs de los contenedores:"
+    echo "Acceso SSH a los nodos target (puerto asignado en localhost):"
     for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
         ALUMNO_ID="alumno$i"
-        NET="${ALUMNO_ID}-net"
-        LINE="  $ALUMNO_ID →"
         if [[ "$DEPLOY_CONTROL" == "true" ]]; then
+            NET="${ALUMNO_ID}-net"
             IP_C=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "${ALUMNO_ID}-control" 2>/dev/null || echo "N/A")
-            LINE="$LINE control: https://$IP_C:8443"
+            echo "  $ALUMNO_ID → control: http://$IP_C:8443"
         fi
         for j in $(seq 1 "$NUM_TARGETS"); do
-            IP_T=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "${ALUMNO_ID}-target${j}" 2>/dev/null || echo "N/A")
-            LINE="$LINE | target${j}: $IP_T"
+            PORT=$(docker port "${ALUMNO_ID}-target${j}" 22 2>/dev/null | cut -d: -f2 || echo "N/A")
+            echo "  $ALUMNO_ID → target${j}: ssh ansible@localhost -p $PORT"
         done
-        echo "$LINE"
+    done
+
+    echo ""
+    echo "Añade estas entradas a /etc/hosts para usar nombres de host en tu inventario:"
+    echo ""
+    for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
+        ALUMNO_ID="alumno$i"
+        for j in $(seq 1 "$NUM_TARGETS"); do
+            echo "127.0.0.1 ${ALUMNO_ID}-target${j}"
+        done
     done
     echo ""
-    echo "Nota: Docker no ofrece DNS del host hacia los contenedores. Usa las IPs"
-    echo "      mostradas arriba o añade entradas manualmente a /etc/hosts."
+    echo "Nota: los puertos SSH de cada target son distintos (ver arriba)."
+    echo "      Configura ~/.ssh/config o el inventario de Ansible con ansible_port."
 fi

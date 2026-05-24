@@ -37,6 +37,8 @@ services:
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw
       - __ALUMNO_ID__-target__TARGET_N__-docker:/var/lib/docker
+    ports:
+      - "0:22"
     networks:
       - __ALUMNO_ID__-net
     command: /lib/systemd/systemd
