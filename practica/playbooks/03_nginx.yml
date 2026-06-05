@@ -1,7 +1,7 @@
 ---
 - name: "Fase 2b — Nginx balanceador en barcelona"
   hosts: barcelona
-  become: yes
+  become: true 
   tags: [despliegue, nginx]
 
   vars:

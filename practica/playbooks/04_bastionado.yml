@@ -1,7 +1,7 @@
 ---
 - name: "Fase 3 — Bastionado UFW"
   hosts: all
-  become: yes
+  become: true 
   tags: [bastionado]
 
   tasks:

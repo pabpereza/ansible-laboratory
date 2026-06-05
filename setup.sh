@@ -9,12 +9,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Lee las plantillas en templates/ y duplica el bloque target N veces.
 # Uso: generate_compose <alumno_id> <num_targets> <server|local>
 # ==============================================================
+PORT_BASE=55000
+
 generate_compose() {
     local ALUMNO_ID="$1"
     local NUM_TARGETS="$2"
     local COMPOSE_MODE="$3"  # server | local
     local ALUMNO_NUM="${4:-0}"  # 0-based index (solo usado en local para calcular puertos)
-    local PORT_BASE=55000
 
     local TEMPLATE
     if [[ "$COMPOSE_MODE" == "server" ]]; then
@@ -36,10 +37,12 @@ generate_compose() {
     # 3. Generar N servicios target
     for j in $(seq 1 "$NUM_TARGETS"); do
         local PORT=$(( PORT_BASE + ALUMNO_NUM * NUM_TARGETS + j - 1 ))
+        local HTTP_PORT=$(( PORT_BASE + 80 + ALUMNO_NUM * NUM_TARGETS + j - 1 ))
         printf '%s\n' "$TARGET_BLOCK" \
             | sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" \
                   -e "s/__TARGET_N__/$j/g" \
-                  -e "s/__PORT__/$PORT/g"
+                  -e "s/__PORT__/$PORT/g" \
+                  -e "s/__HTTP_PORT__/$HTTP_PORT/g"
     done
 
     # 4. Sección networks (entre # __TARGET_END__ y volumes:, exclusive)
@@ -387,6 +390,7 @@ else
     echo "Acceso SSH a los nodos target (puerto asignado en localhost):"
     for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
         ALUMNO_ID="alumno$i"
+        ALUMNO_NUM=$(( 10#$i - 1 ))
         if [[ "$DEPLOY_CONTROL" == "true" ]]; then
             NET="${ALUMNO_ID}-net"
             IP_C=$(docker inspect --format "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "${ALUMNO_ID}-control" 2>/dev/null || echo "N/A")
@@ -394,7 +398,8 @@ else
         fi
         for j in $(seq 1 "$NUM_TARGETS"); do
             PORT=$(docker port "${ALUMNO_ID}-target${j}" 22 2>/dev/null | cut -d: -f2 || echo "N/A")
-            echo "  $ALUMNO_ID → target${j}: ssh ansible@localhost -p $PORT"
+            HTTP_PORT=$(( PORT_BASE + 80 + ALUMNO_NUM * NUM_TARGETS + j - 1 ))
+            echo "  $ALUMNO_ID → target${j}: ssh ansible@localhost -p $PORT  |  http://localhost:$HTTP_PORT"
         done
     done
 

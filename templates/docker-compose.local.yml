@@ -39,6 +39,7 @@ services:
       - __ALUMNO_ID__-target__TARGET_N__-docker:/var/lib/docker
     ports:
       - "__PORT__:22"
+      - "__HTTP_PORT__:80"
     networks:
       - __ALUMNO_ID__-net
     command: /lib/systemd/systemd

@@ -1,6 +1,6 @@
 - name: "Fase 1 — Plataformado"
   hosts: all
-  become: yes
+  become: true
   tags: [plataformado]
 
   vars:
