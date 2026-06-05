@@ -40,7 +40,6 @@
     - name: Instalar Docker
       when: docker_installed.rc != 0
       block:
-
         - name: Instalar dependencias para Docker
           apt:
             name:

@@ -1,6 +1,6 @@
 cpu_per_container: "1.0"
 app_image: pabpereza/quotes:latest
-app_port: 8000
+app_port: 80
 postgres_image: postgres:16-alpine
 postgres_user: quotes
 postgres_db: quotes
