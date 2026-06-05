@@ -13,6 +13,8 @@ generate_compose() {
     local ALUMNO_ID="$1"
     local NUM_TARGETS="$2"
     local COMPOSE_MODE="$3"  # server | local
+    local ALUMNO_NUM="${4:-0}"  # 0-based index (solo usado en local para calcular puertos)
+    local PORT_BASE=55000
 
     local TEMPLATE
     if [[ "$COMPOSE_MODE" == "server" ]]; then
@@ -33,8 +35,11 @@ generate_compose() {
 
     # 3. Generar N servicios target
     for j in $(seq 1 "$NUM_TARGETS"); do
+        local PORT=$(( PORT_BASE + ALUMNO_NUM * NUM_TARGETS + j - 1 ))
         printf '%s\n' "$TARGET_BLOCK" \
-            | sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" -e "s/__TARGET_N__/$j/g"
+            | sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" \
+                  -e "s/__TARGET_N__/$j/g" \
+                  -e "s/__PORT__/$PORT/g"
     done
 
     # 4. Sección networks (entre # __TARGET_END__ y volumes:, exclusive)
@@ -348,13 +353,14 @@ else
 
     for i in $(seq -f "%02g" 1 "$NUM_ALUMNOS"); do
         ALUMNO_ID="alumno$i"
+        ALUMNO_NUM=$(( 10#$i - 1 ))
         ALUMNO_DIR="$SCRIPT_DIR/alumnos/$ALUMNO_ID"
         mkdir -p "$ALUMNO_DIR/workspace"
 
         cp "$SCRIPT_DIR/templates/Dockerfile.control" "$ALUMNO_DIR/Dockerfile.control"
         cp "$SCRIPT_DIR/templates/Dockerfile.target"  "$ALUMNO_DIR/Dockerfile.target"
 
-        generate_compose "$ALUMNO_ID" "$NUM_TARGETS" "local" > "$ALUMNO_DIR/docker-compose.yml"
+        generate_compose "$ALUMNO_ID" "$NUM_TARGETS" "local" "$ALUMNO_NUM" > "$ALUMNO_DIR/docker-compose.yml"
 
         if [[ "$DEPLOY_CONTROL" == "true" ]]; then
             printf 'CODER_PASSWORD=%s\n' "$CODER_PASSWORD" > "$ALUMNO_DIR/.env"

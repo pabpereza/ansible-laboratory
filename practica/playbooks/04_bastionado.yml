@@ -1,0 +1,31 @@
+---
+- name: "Fase 3 — Bastionado UFW"
+  hosts: all
+  become: yes
+  tags: [bastionado]
+
+  tasks:
+    - name: Instalar UFW
+      apt:
+        name: ufw
+        state: present
+        update_cache: yes
+
+    - name: Política por defecto — denegar entrada
+      command: ufw default deny incoming
+      changed_when: true
+
+    - name: Permitir SSH siempre
+      command: ufw allow 22/tcp
+      changed_when: true
+
+    - name: Abrir puertos según rol del servidor
+      command: ufw allow from {{ item.src | default('any') }} to any port {{ item.port }} proto {{ item.proto }}
+      loop: "{{ allowed_ports }}"
+      loop_control:
+        label: "{{ item.port }}/{{ item.proto }} desde {{ item.src | default('any') }}"
+      changed_when: true
+
+    - name: Activar UFW
+      command: ufw --force enable
+      changed_when: true

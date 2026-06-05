@@ -1,0 +1,119 @@
+- name: "Fase 1 — Plataformado"
+  hosts: all
+  become: yes
+  tags: [plataformado]
+
+  vars:
+    docker_arch_map:
+      x86_64: amd64
+      aarch64: arm64
+      armv7l: armhf
+
+  pre_tasks:
+    - name: Verificar requisitos mínimos del servidor
+      assert:
+        that:
+          - ansible_facts['memtotal_mb'] >= 512
+          - ansible_facts['processor_vcpus'] >= 1
+        fail_msg: >
+          {{ inventory_hostname }} no cumple requisitos:
+          RAM {{ ansible_facts['memtotal_mb'] }}MB (mínimo 512MB),
+          vCPUs {{ ansible_facts['processor_vcpus'] }} (mínimo 1)
+        success_msg: "{{ inventory_hostname }} validado — {{ ansible_facts['processor_vcpus'] }} vCPUs, {{ ansible_facts['memtotal_mb'] }}MB RAM"
+
+    - name: Calcular CPU disponible por contenedor (75% del servidor)
+      set_fact:
+        cpu_per_container: "{{ (ansible_facts['processor_vcpus'] * 0.75) | round(1) }}"
+
+  tasks:
+    - name: Actualizar índice de paquetes
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Comprobar si Docker ya está instalado
+      command: docker --version
+      register: docker_installed
+      changed_when: false
+      failed_when: false
+
+    - name: Instalar Docker
+      when: docker_installed.rc != 0
+      block:
+
+        - name: Instalar dependencias para Docker
+          apt:
+            name:
+              - ca-certificates
+              - curl
+            state: present
+
+        - name: Crear directorio para keyrings
+          file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: '0755'
+
+        - name: Descargar clave GPG de Docker
+          get_url:
+            url: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
+            dest: /etc/apt/keyrings/docker.asc
+            mode: '0644'
+
+        - name: Añadir repositorio de Docker
+          copy:
+            dest: /etc/apt/sources.list.d/docker.sources
+            content: |
+              Types: deb
+              URIs: https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}
+              Suites: {{ ansible_facts['distribution_release'] }}
+              Components: stable
+              Architectures: {{ docker_arch_map[ansible_facts['architecture']] | default(ansible_facts['architecture']) }}
+              Signed-By: /etc/apt/keyrings/docker.asc
+          register: docker_repo
+
+        - name: Actualizar cache apt tras añadir repositorio
+          apt:
+            update_cache: yes
+          when: docker_repo.changed
+
+        - name: Instalar Docker CE
+          apt:
+            name: docker-ce
+            state: present
+
+    - name: Configurar storage driver del daemon
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "storage-driver": "vfs"
+          }
+      notify: Reiniciar Docker
+
+    - name: Arrancar servicio de Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Añadir usuario ansible al grupo docker
+      user:
+        name: ansible
+        groups: docker
+        append: yes
+
+    - name: Instalar librerías de Python para Docker
+      apt:
+        name: python3-docker
+        state: present
+
+  handlers:
+    - name: Reiniciar Docker
+      service:
+        name: docker
+        state: restarted
+
+    - name: Actualizar cache apt
+      apt:
+        update_cache: yes

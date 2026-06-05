@@ -1,0 +1,8 @@
+---
+- import_playbook: playbooks/01_plataformar.yml
+
+- import_playbook: playbooks/02_stack.yml
+
+- import_playbook: playbooks/03_nginx.yml
+
+- import_playbook: playbooks/04_bastionado.yml

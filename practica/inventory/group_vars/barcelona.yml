@@ -1,0 +1,4 @@
+allowed_ports:
+  - port: "80"
+    proto: tcp
+    src: any

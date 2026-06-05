@@ -1,0 +1,64 @@
+---
+- name: "Fase 2a — Stack quotes + postgres en madrid"
+  hosts: madrid
+  become: yes
+  tags: [despliegue, stack]
+
+  tasks:
+    - name: Crear directorio del proyecto
+      file:
+        path: "{{ compose_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Renderizar docker-compose.yml
+      template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ compose_dir }}/docker-compose.yml"
+        mode: '0644'
+      notify: Reiniciar stack
+      no_log: true
+
+    - name: Despliegue resiliente del stack
+      block:
+        - name: Levantar stack quotes
+          command:
+            cmd: docker compose up -d --pull missing
+            chdir: "{{ compose_dir }}"
+          register: compose_up
+          changed_when: "'Started' in compose_up.stdout or 'Created' in compose_up.stdout"
+
+        - name: Esperar a que quotes responda
+          uri:
+            url: "http://localhost:{{ app_port }}/"
+            status_code: 200
+          register: health
+          until: health.status == 200
+          retries: 15
+          delay: 5
+
+      rescue:
+        - name: Volcar últimas líneas del log de quotes
+          command: docker logs --tail 30 quotes-quotes-1
+          register: quotes_logs
+          changed_when: false
+          failed_when: false
+
+        - name: Mostrar logs para diagnóstico
+          debug:
+            msg: "{{ quotes_logs.stdout_lines | default(['sin logs disponibles']) }}"
+
+        - name: Fallar con mensaje claro
+          fail:
+            msg: "Stack no arrancó en {{ inventory_hostname }}. Revisa los logs anteriores."
+
+      always:
+        - name: Registrar resultado
+          debug:
+            msg: "Despliegue de stack finalizado en {{ inventory_hostname }}"
+
+  handlers:
+    - name: Reiniciar stack
+      command:
+        cmd: docker compose restart
+        chdir: "{{ compose_dir }}"
