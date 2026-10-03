@@ -17,6 +17,7 @@ Infraestructura para desplegar un laboratorio de Ansible para múltiples alumnos
 - **Traefik** *(solo modo VPS/Cloud)*: Proxy inverso que enruta `alumnoXX.dominio.com` al contenedor Code-Server correcto y gestiona certificados SSL via Let's Encrypt.
 - **Entorno por alumno**:
   - `control`: IDE web (VS Code via code-server) con `ansible`, `sshpass` y herramientas instaladas. Opcional en modo local.
+    Su hostname es `controlXX` y el usuario de la terminal es `alumnoXX` (XX = número de alumno).
   - `targetN`: N contenedores Debian (configurable en la instalación) preparados para ejecutar Ansible, con soporte para `systemd` y Docker-in-Docker (DinD).
 
 ## Modos de despliegue
@@ -33,6 +34,11 @@ Pensado para pruebas en tu propia máquina. No requiere dominio ni Traefik. El n
 
 ### Requisitos previos
 - Docker y Docker Compose instalados.
+- *(Linux)* Límites de inotify ampliados. Cada nodo target ejecuta systemd, y con el valor por defecto (`fs.inotify.max_user_instances = 128`) solo arrancan unos 20 targets en todo el host: el resto se queda reiniciando con `Failed to allocate manager object: Too many open files`. El instalador lo comprueba y ofrece aplicarlo; para hacerlo a mano:
+  ```bash
+  printf 'fs.inotify.max_user_instances = 8192\nfs.inotify.max_user_watches = 1048576\n' | sudo tee /etc/sysctl.d/99-ansible-lab.conf
+  sudo sysctl --system
+  ```
 - *(Solo modo VPS)* Dominio con registro A Wildcard apuntando a la IP del servidor (ej. `*.midominio.com → <IP>`).
 
 ### Ejecutar el instalador

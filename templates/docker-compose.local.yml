@@ -10,7 +10,9 @@ services:
       context: .
       dockerfile: Dockerfile.control
     container_name: __ALUMNO_ID__-control
+    hostname: control__ALUMNO_N__
     environment:
+      - ALUMNO_USER=__ALUMNO_ID__
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

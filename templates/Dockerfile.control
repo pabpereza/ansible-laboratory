@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM linuxserver/code-server:latest
 
 # Instalar dependencias necesarias para el curso:
@@ -25,3 +26,31 @@ RUN mkdir -p /etc/ansible && \
 # Tema oscuro por defecto en code-server
 RUN mkdir -p /config/data/User && \
     echo '{"workbench.colorTheme": "Default Dark+"}' > /config/data/User/settings.json
+
+# Usuario del alumno: la imagen de linuxserver usa internamente el usuario "abc"
+# (sus scripts de arranque dependen de ese nombre), así que en vez de renombrarlo
+# se crea un alias con el mismo UID/GID y el nombre ALUMNO_USER, colocado antes
+# de abc para que whoami, el prompt y sudo muestren el nombre del alumno.
+# Se ejecuta en cada arranque, después de que init-code-server fije la contraseña de abc.
+COPY --chmod=755 <<'EOF' /custom-cont-init.d/10-alumno-user
+#!/usr/bin/with-contenv bash
+[[ -z "${ALUMNO_USER}" ]] && exit 0
+
+# Inserta en $1 una copia de la línea de abc con el nombre del alumno.
+# $2 (opcional) sustituye el último campo (shell en /etc/passwd).
+alias_abc() {
+    awk -v u="${ALUMNO_USER}" -v last="$2" 'BEGIN { FS = OFS = ":" }
+        $1 == u { next }
+        $1 == "abc" { l = $0; $1 = u; if (last != "") $NF = last; print; $0 = l }
+        { print }' "$1" > "$1.tmp" && cat "$1.tmp" > "$1" && rm -f "$1.tmp"
+}
+
+alias_abc /etc/passwd /bin/bash
+alias_abc /etc/group
+alias_abc /etc/shadow
+
+if [[ -n "${SUDO_PASSWORD}" ]] || [[ -n "${SUDO_PASSWORD_HASH}" ]]; then
+    echo "${ALUMNO_USER} ALL=(ALL:ALL) ALL" > /etc/sudoers.d/alumno
+    chmod 440 /etc/sudoers.d/alumno
+fi
+EOF

@@ -26,7 +26,8 @@ generate_compose() {
 
     # 1. Cabecera + nodo control (todo antes de # __TARGET_START__)
     awk '/^# __TARGET_START__$/{exit} {print}' "$TEMPLATE" \
-        | sed "s/__ALUMNO_ID__/$ALUMNO_ID/g"
+        | sed -e "s/__ALUMNO_ID__/$ALUMNO_ID/g" \
+              -e "s/__ALUMNO_N__/${ALUMNO_ID#alumno}/g"
 
     # 2. Extraer bloque target de la plantilla (entre marcadores, sin ellos)
     local TARGET_BLOCK
@@ -56,6 +57,47 @@ generate_compose() {
     for j in $(seq 1 "$NUM_TARGETS"); do
         printf '  %s-target%s-docker:\n' "$ALUMNO_ID" "$j"
     done
+}
+
+# ==============================================================
+# FUNCIÓN: comprueba el límite de inotify del host
+# Cada target ejecuta systemd, que consume varias instancias de inotify.
+# El límite es por UID y todos los contenedores corren como root, así que
+# con el valor por defecto (128) solo arrancan ~20 targets; el resto entra
+# en bucle de reinicio con "Failed to allocate manager object: Too many open files".
+# ==============================================================
+INOTIFY_MIN_INSTANCES=8192
+INOTIFY_MIN_WATCHES=1048576
+INOTIFY_SYSCTL_FILE="/etc/sysctl.d/99-ansible-lab.conf"
+
+check_inotify() {
+    # Solo aplica en Linux (en Docker Desktop el kernel es el de la VM)
+    [ -r /proc/sys/fs/inotify/max_user_instances ] || return 0
+
+    local CUR_INSTANCES CUR_WATCHES
+    CUR_INSTANCES=$(cat /proc/sys/fs/inotify/max_user_instances)
+    CUR_WATCHES=$(cat /proc/sys/fs/inotify/max_user_watches)
+
+    if [ "$CUR_INSTANCES" -ge "$INOTIFY_MIN_INSTANCES" ] && [ "$CUR_WATCHES" -ge "$INOTIFY_MIN_WATCHES" ]; then
+        return 0
+    fi
+
+    echo "AVISO: los límites de inotify del host son demasiado bajos para systemd en muchos contenedores."
+    echo "  fs.inotify.max_user_instances = $CUR_INSTANCES (mínimo recomendado: $INOTIFY_MIN_INSTANCES)"
+    echo "  fs.inotify.max_user_watches   = $CUR_WATCHES (mínimo recomendado: $INOTIFY_MIN_WATCHES)"
+    echo "Sin ajustarlos, parte de los nodos target no llegarán a arrancar."
+    echo ""
+    read -rp "¿Aplicar los nuevos límites de forma persistente en $INOTIFY_SYSCTL_FILE (requiere sudo)? [S/n]: " _INOTIFY
+    if [[ "$_INOTIFY" =~ ^[nN]$ ]]; then
+        echo "Continuando sin ajustar inotify."
+        echo ""
+        return 0
+    fi
+
+    printf 'fs.inotify.max_user_instances = %s\nfs.inotify.max_user_watches = %s\n' \
+        "$INOTIFY_MIN_INSTANCES" "$INOTIFY_MIN_WATCHES" | sudo tee "$INOTIFY_SYSCTL_FILE" >/dev/null
+    sudo sysctl -p "$INOTIFY_SYSCTL_FILE"
+    echo ""
 }
 
 # ==============================================================
@@ -90,6 +132,7 @@ if [ -d "$SCRIPT_DIR/alumnos" ] && [ "$(ls -A "$SCRIPT_DIR/alumnos" 2>/dev/null)
     # --- RELANZAR ---
     if [[ "$_EXISTING_ACTION" == "1" ]]; then
         echo ""
+        check_inotify
 
         if [[ "$_PREV_MODE" == "server" ]]; then
             if [ -f "$SCRIPT_DIR/traefik/letsencrypt/acme.json" ]; then
@@ -271,6 +314,7 @@ echo ""
 read -rp "¿Continuar con la instalación? [S/n]: " _GO
 [[ "$_GO" =~ ^[nN]$ ]] && { echo "Instalación cancelada."; exit 0; }
 echo ""
+check_inotify
 echo "Iniciando despliegue..."
 echo ""
 
