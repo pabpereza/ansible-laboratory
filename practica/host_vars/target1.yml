@@ -1,0 +1,2 @@
+ansible_user: ansible
+wp_port: 8080

@@ -1,0 +1,42 @@
+---
+- name: Desplegar WordPress con Docker Compose
+  hosts: target1
+  become: true
+
+  vars:
+    mysql_root_password: "rootpass123"
+    mysql_password: "wppass123"
+    compose_dir: /opt/wordpress
+    wp_port: 80
+
+  tasks:
+    - name: Crear directorio del proyecto
+      file:
+        path: "{{ compose_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Renderizar docker-compose.yml con variables
+      template:
+        src: ./compose.yml.j2
+        dest: "{{ compose_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    - name: Levantar stack WordPress
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_dir }}"
+        state: present
+        pull: missing
+
+    - name: Esperar a que WordPress responda
+      uri:
+        url: "http://localhost:{{ wp_port }}"
+        status_code: [200, 302]
+      register: wp_health
+      until: wp_health.status in [200, 302]
+      retries: 30
+      delay: 5
+    
+    - name: Mostrar mensaje de éxito
+      debug:
+        msg: "WordPress desplegado correctamente en http://localhost:{{ wp_port }}"

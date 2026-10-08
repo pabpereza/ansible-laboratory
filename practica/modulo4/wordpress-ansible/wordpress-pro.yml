@@ -1,0 +1,47 @@
+# roles/mariadb/tasks/main.yml
+---
+- name: Instalar MariaDB y PyMySQL
+  apt:
+    name:
+      - mariadb-server
+      - python3-pymysql
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Arrancar y habilitar MariaDB
+  systemd_service:
+    name: mariadb
+    state: started
+    enabled: true
+
+- name: Eliminar usuarios anónimos
+  community.mysql.mysql_user:
+    name: ""
+    host_all: true
+    state: absent
+    login_unix_socket: "{{ mariadb_socket }}"
+
+- name: Eliminar la base de datos de test
+  community.mysql.mysql_db:
+    name: test
+    state: absent
+    login_unix_socket: "{{ mariadb_socket }}"
+
+- name: Crear la base de datos de WordPress
+  community.mysql.mysql_db:
+    name: "{{ wp_db_name }}"
+    encoding: utf8mb4
+    collation: utf8mb4_unicode_ci
+    state: present
+    login_unix_socket: "{{ mariadb_socket }}"
+
+- name: Crear el usuario de WordPress
+  community.mysql.mysql_user:
+    name: "{{ wp_db_user }}"
+    password: "{{ wp_db_password }}"
+    host: localhost
+    priv: "{{ wp_db_name }}.*:ALL"
+    state: present
+    login_unix_socket: "{{ mariadb_socket }}"
+  no_log: true

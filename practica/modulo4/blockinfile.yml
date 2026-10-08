@@ -1,0 +1,12 @@
+- name: Configurar memoria SWAP
+  hosts: target1
+  become: true
+  
+  tasks:
+    - name: Añadir configuración de swap a sysctl
+      blockinfile:
+        path: /etc/sysctl.conf
+        marker: "# {mark} CONFIG SWAP "
+        block: |
+          vm.swappiness=5
+          vm.vfs_cache_pressure=50

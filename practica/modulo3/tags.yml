@@ -1,0 +1,12 @@
+tasks:
+  - name: Esta task siempre se ejecuta
+    debug:
+      msg: "Soy inevitable"
+    tags:
+      - always
+
+  - name: Esta nunca se ejecuta (a menos que lo especifiques)
+    debug:
+      msg: "Solo con --tags never"
+    tags:
+      - never

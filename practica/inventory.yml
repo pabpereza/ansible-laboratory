@@ -1,0 +1,16 @@
+all:
+  children:
+    madrid:
+      hosts:
+        target1:
+          ansible_host: target1
+        target2:
+          ansible_host: target2
+    barcelona:
+      hosts:
+        target3:
+          ansible_host: target3
+    servers:
+      children:
+        madrid:
+        barcelona:

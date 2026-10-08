@@ -1,0 +1,81 @@
+- name: Configurar Servidor web con handlers, loops y tags
+  hosts: target1
+  become: true
+
+  tasks:
+    - name: Actualizar índices de paquetes
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Instalar paquetes necesarios
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+        - nginx
+        - ufw
+      tags:
+        - install
+
+    - name: Configurar firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        state: enabled
+      loop:
+        - "22"
+        - "80"
+        - "443"
+      tags:
+        - security
+        - config
+
+    - name: Copiar configuración de Nginx
+      copy:
+        src: ./nginx.conf
+        dest: /etc/nginx/nginx.conf
+        owner: nginx
+        group: nginx
+        mode: '0644'
+        backup: true
+        validate: 'nginx -t -c %s'
+      notify: Recargar nginx
+      tags:
+        - config
+        - nginx
+
+    - name: Crear página web personalizada
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <h1>¡Hola desde Ansible! 🚀</h1>
+          <p>Este servidor ha sido configurado automáticamente.</p>
+          <p>SO: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}</p>
+        owner: nginx
+
+      tags:
+        - config
+        - nginx
+
+    - name: Asegurar que Nginx está corriendo
+      service:
+        name: nginx
+        state: started
+        enabled: true
+      tags:
+        - nginx
+
+    - name: Mostrar IP del servidor (solo en Debian)
+      debug:
+        msg: "Servidor accesible en: http://{{ ansible_facts['default_ipv4']['address'] }}"
+      when: ansible_facts['distribution'] == "Debian"
+      tags:
+        - ip
+
+  handlers:
+    - name: Recargar nginx
+      service:
+        name: nginx
+        state: reloaded

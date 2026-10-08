@@ -1,0 +1,7 @@
+#SPDX-License-Identifier: MIT-0
+---
+# handlers file for webserver
+- name: Recargar nginx
+  service:
+    name: nginx
+    state: reloaded

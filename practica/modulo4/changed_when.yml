@@ -1,0 +1,14 @@
+- name: Configurar fichero hostname
+  hosts: target1
+  become: true
+  
+  tasks:
+    - name: Comprobar la conectividad con Google
+      ansible.builtin.command: curl google.com
+      register: google_check
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar el resultado de la comprobación
+      ansible.builtin.debug:
+        msg: "Google is {{ 'online' if google_check.rc == 0 else 'offline' }}"

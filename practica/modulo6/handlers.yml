@@ -1,0 +1,29 @@
+- name: Instalación servidor web
+  hosts: all
+  become: true
+  force_handlers: true # Fuerza la ejecución de todos los handlers, aunque falle el playbook
+
+  tasks:
+    - name: Actualizar certificado TLS
+      copy:
+        src: files/cert.pem
+        dest: /etc/ssl/app.crt
+      notify:
+        - Reload nginx
+        - Reload haproxy   # Ambos necesitan recargar tras cambio de cert
+
+    # Forzar la ejecución de los handlers
+    - name: Forzar ejecución de handlers pendientes
+      meta: flush_handlers
+
+
+  handlers:
+    - name: Reload nginx
+      service: 
+        name: nginx
+        state: reloaded
+
+    - name: Reload haproxy
+      service:
+        name: haproxy
+        state: reloaded

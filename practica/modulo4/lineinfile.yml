@@ -1,0 +1,12 @@
+- name: Configurar servidor SSH
+  hosts: target1
+  become: true
+  
+  tasks:
+    - name: Configurar SSH - deshabilitar root login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'   # Regex para encontrar la línea (aunque esté comentada)
+        line: 'PermitRootLogin no'    # Valor final deseado
+        state: present
+

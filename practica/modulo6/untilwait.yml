@@ -1,0 +1,19 @@
+- name: Ejemplos until
+  hosts: target3
+  become: true
+
+  tasks:
+    - name: Esperar a que la aplicación responda
+      uri:
+        url: http://localhost:80
+        status_code: 200
+      register: health_check
+      until: health_check.status == 200
+      retries: 5         # Máximo 30 intentos
+      delay: 5
+
+    - name: Esperar a que el puerto esté abierto
+      wait_for:
+        host: localhost
+        port: 80
+        timeout: 60

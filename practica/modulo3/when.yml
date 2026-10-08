@@ -1,0 +1,24 @@
+# Verificar versión del SO
+- name: Tarea solo para Ubuntu 20.04
+  debug:
+    msg: "Este es Ubuntu 20.04"
+  when: ansible_facts['distribution_version'] == "20.04"
+
+# Verificar si existe un archivo
+- name: Configurar backup solo si existe el directorio
+  command: /usr/local/bin/backup.sh
+  when: backup_dir.stat.exists
+
+# Múltiples condiciones (AND)
+- name: Instalar solo en servidores de producción con Ubuntu
+  apt:
+    name: monitoring-agent
+  when:
+    - ansible_facts['distribution'] == "Ubuntu"
+    - ansible_facts['environment'] == "production"
+
+# Condición OR
+- name: Instalar en Debian o Ubuntu
+  apt:
+    name: nginx
+  when: ansible_facts['distribution'] == "Debian" or ansible_facts['distribution'] == "Ubuntu"

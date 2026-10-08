@@ -1,0 +1,71 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for webserver
+- name: Actualizar índices de paquetes
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Instalar paquetes necesarios
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ webserver_packages }}"
+  tags:
+    - install
+
+- name: Configurar firewall
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+  loop: "{{ webserver_allowed_ports }}"
+  tags:
+    - security
+    - config
+
+- name: Crear usuario nginx
+  user:
+    name: nginx
+    shell: /usr/sbin/nologin
+    system: yes
+
+- name: Copiar configuración de Nginx
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: nginx
+    group: nginx
+    mode: '0644'
+    backup: yes
+    validate: 'nginx -t -c %s'
+  notify: Recargar nginx
+  tags:
+    - config
+    - nginx
+
+- name: Crear página web personalizada
+  copy:
+    dest: "{{ webserver_html_root }}/index.html"
+    content: |
+      <h1>¡Hola desde Ansible! 🚀</h1>
+      <p>Este servidor ha sido configurado automáticamente.</p>
+      <p>SO: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}</p>
+    owner: nginx
+  tags:
+    - config
+    - nginx
+
+- name: Asegurar que Nginx está corriendo
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+  tags:
+    - nginx
+
+- name: Mostrar IP del servidor (solo en Debian)
+  debug:
+    msg: "Servidor accesible en: http://{{ ansible_facts['default_ipv4']['address'] }}"
+  when: ansible_facts['distribution'] == "Debian"
+  tags:
+    - ip

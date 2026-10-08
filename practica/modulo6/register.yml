@@ -1,0 +1,15 @@
+- name: Ejemplos facts
+  hosts: all
+  become: true
+  #gather_facts: false
+
+  tasks:
+    - name: Verificar estado de nginx
+      command: systemctl is-active nginx
+      register: nginx_status
+      failed_when: false    # No fallar si nginx no está activo
+
+    - name: Mostrar estado
+      debug:
+        msg: "Nginx está: {{ nginx_status }}"
+

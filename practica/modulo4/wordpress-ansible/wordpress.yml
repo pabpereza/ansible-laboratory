@@ -1,0 +1,51 @@
+---
+- name: WordPress con MariaDB
+  hosts: target2
+  become: true
+
+  vars:
+    db_name: wordpress
+    db_user: wordpress
+    db_password: cambiame
+
+  tasks:
+    - name: Instalar paquetes
+      apt:
+        name:
+          - apache2
+          - mariadb-server
+          - php
+          - libapache2-mod-php
+          - php-mysql
+        update_cache: true
+
+    - name: Crear base de datos y usuario
+      command:
+        cmd: mysql
+        stdin: |
+          CREATE DATABASE IF NOT EXISTS {{ db_name }};
+          CREATE USER IF NOT EXISTS '{{ db_user }}'@'localhost' IDENTIFIED BY '{{ db_password }}';
+          GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'localhost';
+
+    - name: Descargar WordPress
+      unarchive:
+        src: https://wordpress.org/latest.tar.gz
+        dest: /var/www/html
+        remote_src: true
+        extra_opts: [--strip-components=1]
+        owner: www-data
+        group: www-data
+        creates: /var/www/html/wp-settings.php
+
+    - name: Borrar la página por defecto de Apache
+      file:
+        path: /var/www/html/index.html
+        state: absent
+
+    - name: Configurar wp-config.php
+      template:
+        src: wp-config.php.j2
+        dest: /var/www/html/wp-config.php
+        owner: www-data
+        group: www-data
+        mode: "0640"

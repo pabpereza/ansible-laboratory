@@ -1,0 +1,52 @@
+---
+- name: Workaround overlayfs invalid argument
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Parar Docker antes de reconfigurar
+      service:
+        name: docker
+        state: stopped
+
+    - name: Configurar daemon de Docker con vfs y snapshotter desactivado
+      copy:
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+        content: |
+          {
+            "storage-driver": "vfs",
+            "features": {
+              "containerd-snapshotter": false
+            }
+          }
+
+    - name: Limpiar snapshotter overlayfs heredado si existe
+      file:
+        path: /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
+        state: absent
+      failed_when: false
+
+    - name: Arrancar Docker con nueva configuración
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Recolectar info de Docker
+      command: docker info
+      register: docker_info
+      changed_when: false
+
+    - name: Mostrar storage driver activo
+      debug:
+        msg: "Driver activo: {{ docker_info.stdout | regex_search('Storage Driver: (.+)', '\\1') }}"
+
+    - name: Verificar hello-world tras workaround
+      command: docker run --rm hello-world
+      register: hello_after_fix
+      changed_when: false
+
+    - name: Mostrar resultado de hello-world
+      debug:
+        var: hello_after_fix.stdout_lines

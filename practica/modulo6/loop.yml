@@ -1,0 +1,19 @@
+- name: Ejemplo loop avanzado
+  hosts: target3
+  become: true
+
+  tasks:
+    - name: Instalar paquetes con etiqueta legible
+      apt:
+        name: "{{ pkg.name }}"
+        state: "{{ pkg.state }}"
+      loop:
+        - name: nginx
+          state: absent
+        - name: apache2
+          state: absent
+      loop_control:
+        loop_var: pkg              # Renombra "item" a algo más descriptivo
+        label: "{{ pkg.name }}"    # Qué mostrar en la salida (evita dumps de JSON)
+        pause: 1                   # Segundos entre iteraciones
+        index_var: idx             # Contador disponible como {{ idx }}

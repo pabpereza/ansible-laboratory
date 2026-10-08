@@ -1,0 +1,25 @@
+- name: Instalar múltiples paquetes
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - git
+    - curl
+    - vim
+    - htop
+
+---
+
+
+- name: Crear múltiples usuarios
+  user:
+    name: "{{ item.name }}"
+    groups: "{{ item.groups }}"
+    shell: /bin/bash
+  loop:
+    - name: 'alice'
+      groups: 'sudo,developers'
+    - name: 'bob'
+      groups: 'developers'
+    - name: 'charlie'
+      groups: 'sudo'

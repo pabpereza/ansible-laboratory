@@ -1,0 +1,21 @@
+- name: Construir y publicar imagen de quotes
+  hosts: target3
+  become: true
+
+  vars:
+    app_dir: /opt/quotes
+    repo_url: https://github.com/pabpereza/quotes.git
+
+  tasks:
+    - name: Clonar repositorio quotes
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: main
+        force: yes
+
+    - name: Levantar stack quotes con Compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: present
+        pull: always

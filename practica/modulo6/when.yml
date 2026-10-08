@@ -1,0 +1,22 @@
+- name: Ejemplos when + register
+  hosts: all
+  become: true
+  #gather_facts: false
+
+  tasks:
+    - name: Verificar si Docker está instalado
+      command: docker -v
+      register: docker_check
+      failed_when: false
+      changed_when: false
+
+    - name: Instalar Docker si falta 
+      apt:
+        name: docker.io
+        state: present
+      when: docker_check.rc != 0
+
+    - name: Mostrar versión si está instalado
+      command: docker --version
+      when: docker_check.rc == 0
+      changed_when: false

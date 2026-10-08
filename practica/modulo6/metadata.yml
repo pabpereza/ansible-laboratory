@@ -1,0 +1,17 @@
+- name: Ejemplos metadatos
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Mostrar metadatos del hosts actual
+      debug:
+        msg: |
+          Host en inventario: {{ inventory_hostname }}
+          Grupos a los que pertenece: {{ group_names }}
+          Todos los hosts del grupo madrid: {{ groups['madrid'] }}
+          ¿Modo check activo?: {{ ansible_check_mode }}
+
+    - name: Modo depuración
+      debug:
+        msg: "Estoy en modo depuración"
+      when: ansible_check_mode

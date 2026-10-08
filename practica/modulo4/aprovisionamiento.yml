@@ -1,0 +1,26 @@
+- name: Aprovisionamiento prometheus
+  hosts: target1
+  become: true
+
+  tasks:
+    - name: Descargar binario prometheus
+      get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.linux-amd64.tar.gz"
+        dest: /tmp/prometheus.tar.gz
+        checksum: "sha256:1c7f489a3cc919c1ed0df2ae673a280309dc4a3eaa6ee3411e7d1f4bdec4d4c5"
+        mode: '0644'
+
+    - name: Descomprimir Prometheus
+      unarchive:
+        src: /tmp/prometheus.tar.gz
+        dest: /opt/
+        remote_src: yes           # El archivo está en el servidor remoto, no en tu PC
+        creates: /opt/prometheus-2.45.0.linux-amd64/  # Skip si el directorio ya existe
+
+    - name: Clonar repositorio de la aplicación
+      git:
+        repo: https://github.com/prometheus/prometheus.git
+        dest: /opt/prometheus-2.1.0
+        version: "v2.1.0"         # Branch, tag o commit hash (evita 'main' en producción)
+        update: yes               # Pull si ya existe el repo
+        force: no                 # No sobreescribir cambios locales

@@ -1,0 +1,13 @@
+- name: Ejemplos facts
+  hosts: all
+  become: true
+  #gather_facts: false
+
+  tasks:
+    - name: Calcular memoria disponible para la JVM
+      set_fact:
+        jvm_heap_mb: "{{ (ansible_facts['memtotal_mb'] * 0.7) | int }}"
+
+    - name: Mostrar mensaje de éxito
+      debug:
+        msg: "Memoria Heap asignada: {{ jvm_heap_mb }}"

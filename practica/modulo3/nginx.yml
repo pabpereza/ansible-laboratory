@@ -1,0 +1,74 @@
+- name: Play 1 - Configurar servidor web nginx  # <-- PLAY
+  hosts: target2
+  become: true
+  tags:
+    - install
+
+  tasks:
+    - name: 1 - Actualizar índice de paquetes
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags:
+        - install  
+
+    - name: 2 - Instalar paquete nginx + dependencias       # <-- TASK
+      apt:                                  # <-- MODULE
+        name: "{{ item }}"
+        state: absent
+      when: ansible_facts['distribution'] == "Debian"
+      loop:
+        - git
+        - curl
+        - nginx
+        - vim
+      tags:
+        - install
+
+    - name: 3 - Crear el usuario nginx
+      user:
+        name: nginx
+        shell: /usr/sbin/nologin
+        system: yes
+      tags:
+        - nginx
+
+    - name: 4 - Subir configuración de nginx
+      copy:
+        src: ./nginx.conf
+        dest: /etc/nginx/nginx.conf
+        owner: nginx
+        group: nginx
+        mode: '0644'
+      notify: Recargar nginx
+      tags:
+        - config
+        - nginx
+
+    - name: 5 - Arrancar nginx
+      service:
+        name: nginx
+        state: started
+        enabled: true
+      tags:
+        - nginx
+
+  handlers:
+    - name: Recargar nginx
+      service:
+        name: nginx
+        state: reloaded
+
+- name: Play 2 - Despliegue de app web
+  hosts: target1
+  become: true
+  tags:
+    - deploy
+  
+  tasks:
+    - name: 1 - Actualizar índice de paquetes
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags:
+        - install  

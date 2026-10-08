@@ -1,0 +1,11 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for webserver
+webserver_packages:
+  - nginx
+  - ufw
+webserver_allowed_ports:
+  - "22"
+  - "80"
+  - "443"
+webserver_html_root: /var/www/html

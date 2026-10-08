@@ -1,0 +1,93 @@
+- name: Instalación de docker
+  hosts: all
+  become: true
+  tags:
+    - install
+
+  vars:
+    docker_arch_map:
+      x86_64: amd64
+      aarch64: arm64
+      armv7l: armhf
+
+  tasks:
+    - name: Actualizar índice de paquetes
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Instalar dependencias para Docker
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - python3-debian
+        state: present
+
+    - name: Añadir repositorio de Docker
+      deb822_repository:
+        name: docker
+        types: deb
+        uris: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}"
+        suites: "{{ ansible_facts['distribution_release'] }}"
+        components: stable
+        architectures: "{{ docker_arch_map[ansible_facts['architecture']] | default(ansible_facts['architecture']) }}"
+        signed_by: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
+        state: present
+
+    - name: Actualizar índice de paquetes tras añadir Docker
+      apt:
+        update_cache: yes
+        cache_valid_time: 0
+
+    - name: Instalar Docker CE
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+  
+    - name: Arrancar servicio de Docker
+      service:
+        name: docker
+        state: started
+        enabled: yes
+  
+    - name: Añadir usuario ansible al grupo docker
+      user:
+        name: ansible
+        groups: docker
+        append: yes # Añade el grupo sin borrar los existentes
+
+    - name: Instalar paquete pip para Python 3
+      apt:
+        name: python3-pip
+        state: present
+        
+    - name: Instalar librerías de Python para Docker
+      apt:
+        name: python3-docker
+        state: present
+
+
+- name: Comprobar la instalación de Docker
+  hosts: all
+  become: true
+  tags:
+    - check
+
+  tasks:
+    - name: Ejecutar hello-world
+      command: docker run --rm hello-world
+      register: hello_world_result
+      changed_when: false
+
+    - name: Mostrar salida de hello-world
+      debug:
+        var: hello_world_result.stdout_lines
+
+
