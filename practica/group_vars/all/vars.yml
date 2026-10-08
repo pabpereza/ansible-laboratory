@@ -1,0 +1,7 @@
+# group_vars/all/vars.yml
+app_name: quotes
+app_image: pabpereza/quotes:latest
+app_port: 8000
+postgres_user: quotes
+postgres_db: quotes
+postgres_password: "{{ vault_db_password }}"   # el único secreto

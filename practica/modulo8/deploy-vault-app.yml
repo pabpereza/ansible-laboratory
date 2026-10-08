@@ -1,0 +1,58 @@
+- name: Desplegar aplicación como contenedor con secretos
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Crear red Docker para quotes y PostgreSQL
+      community.docker.docker_network:
+        name: quotes_network
+        state: present
+
+    - name: Desplegar contenedor PostgreSQL
+      community.docker.docker_container:
+        name: postgres
+        image: postgres:16-alpine
+        state: started
+        restart_policy: unless-stopped
+        env:
+          POSTGRES_USER: "{{ postgres_user }}"
+          POSTGRES_PASSWORD: "{{ postgres_password }}"
+          POSTGRES_DB: "{{ postgres_db }}"
+        volumes:
+          - postgres_data:/var/lib/postgresql/data
+        networks:
+          - name: quotes_network
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - "pg_isready -U {{ postgres_user }} -d {{ postgres_db }}"
+          interval: 10s
+          timeout: 5s
+          retries: 5
+      no_log: true
+
+    - name: Desplegar contenedor quotes conectado a PostgreSQL
+      community.docker.docker_container:
+        name: "{{ app_name }}"
+        image: "{{ app_image }}"
+        state: started
+        restart_policy: unless-stopped
+        pull: true
+        ports:
+          - "{{ app_port }}:8000"
+        networks:
+          - name: quotes_network
+        env:
+          POSTGRES_HOST: "{{ postgres_host }}"
+          POSTGRES_USER: "{{ postgres_user }}"
+          POSTGRES_PASSWORD: "{{ postgres_password }}"
+          POSTGRES_DB: "{{ postgres_db }}"
+      no_log: true
+
+    - name: Mostrar configuración (sin secretos)
+      debug:
+        msg: |
+          App: {{ app_name }}
+          Puerto: {{ app_port }}
+          Postgres Host: {{ postgres_host }}
+          Postgres Password: ******** (oculto por seguridad)
