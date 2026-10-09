@@ -1,0 +1,35 @@
+- name: Ver el valor de una variable
+  debug:
+    var: my_variable
+
+- name: Ver con formato personalizado
+  debug:
+    msg: "El puerto es {{ app_port }} y el host es {{ db_host }}"
+
+- name: Ver tipo y contenido de una variable compleja
+  debug:
+    var: ansible_facts
+    verbosity: 2  # Solo se muestra con -vv o más
+
+- name: Ejecutar comando
+  shell: systemctl status nginx
+  register: nginx_status
+  ignore_errors: yes
+
+- name: Ver TODO el resultado (estructura completa)
+  debug:
+    var: nginx_status
+
+- name: Ver solo lo que necesitas
+  debug:
+    msg: |
+      RC: {{ nginx_status.rc }}
+      Stdout: {{ nginx_status.stdout_lines | join('\n') }}
+      Stderr: {{ nginx_status.stderr }}
+      Changed: {{ nginx_status.changed }}
+      Failed: {{ nginx_status.failed }}
+
+- name: Alerta si hay poco disco
+  debug:
+    msg: "⚠️ ¡Poco espacio en disco! Solo {{ disk_free }}MB libres"
+  when: disk_free | int < 1024
