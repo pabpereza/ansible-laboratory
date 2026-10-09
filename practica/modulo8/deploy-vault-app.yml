@@ -1,5 +1,5 @@
 - name: Desplegar aplicación como contenedor con secretos
-  hosts: all
+  hosts: madrid
   become: true
 
   tasks:

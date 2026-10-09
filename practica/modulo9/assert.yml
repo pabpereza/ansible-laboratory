@@ -1,0 +1,27 @@
+- name: Validaciones previas al despliegue en producción
+  hosts: servers
+  become: true
+
+  tasks:
+    - name: Verificar requisitos mínimos del servidor
+      assert:
+        that:
+          - ansible_facts['memtotal_mb'] >= 4096
+          - ansible_facts['processor_vcpus'] >= 2
+        fail_msg: |
+          ❌ El servidor no cumple los requisitos mínimos:
+          - RAM: {{ ansible_facts['memtotal_mb'] }}MB (mínimo 4096MB)
+          - CPUs: {{ ansible_facts['processor_vcpus'] }} (mínimo 2)
+        success_msg: "✅ Servidor validado. Procediendo con el despliegue."
+
+    - name: Verificar conectividad con servicios externos
+      uri:
+        url: "http://localhost"
+        status_code: 200
+      register: api_status
+
+    - name: Confirmar que la API está operativa
+      assert:
+        that:
+          - api_status.status == 200
+        fail_msg: "La API externa no está disponible. Abortando despliegue."

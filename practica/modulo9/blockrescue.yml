@@ -1,0 +1,42 @@
+- name: Migración de base de datos con protección
+  hosts: barcelona
+  become: true
+
+  tasks:
+    - name: Migración segura de base de datos
+      block:
+        - name: Crear backup antes de migrar
+          shell: |
+            mysqldump --all-databases > /backup/pre-migration-$(date +%Y%m%d).sql
+          register: backup_result
+
+        - name: Ejecutar migración
+          shell: mysql < /opt/migrations/v2.0.sql
+          register: migration_result
+          
+        - name: Verificar migración
+          failed_when:
+            - migration_result.rc != 0
+            - "'WARNING' not in migration_result.stdout"
+
+        - name: Verificar integridad
+          shell: mysqlcheck --all-databases --check
+          register: check_result
+
+      rescue:
+        - name: La migración falló, restaurar backup
+          shell: mysql < /backup/pre-migration-*.sql
+
+        - name: Notificar al equipo de DB
+          debug:
+            msg: |
+              ❌ Migración fallida.
+              Backup restaurado automáticamente.
+              Error: {{ ansible_failed_result.msg | default('Desconocido') }}
+
+      always:
+        - name: Registrar resultado en log
+          lineinfile:
+            path: /var/log/migrations.log
+            line: "{{ ansible_date_time.iso8601 }} - Migración v2.0 - {{ 'OK' if migration_result is defined and migration_result.rc == 0 else 'FALLIDA' }}"
+            create: yes

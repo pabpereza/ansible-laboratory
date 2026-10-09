@@ -1,0 +1,5 @@
+- name: Intentar detener un servicio que puede no existir
+  systemd:
+    name: servicio-opcional
+    state: stopped
+  ignore_errors: yes
