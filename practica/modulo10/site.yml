@@ -1,0 +1,12 @@
+---
+- name: "Infraestructura quotes — entrada principal"
+  import_playbook: playbooks/01_plataformado.yml
+
+- name: "Stack quotes en madrid"
+  import_playbook: playbooks/02_stack.yml
+
+- name: "Nginx balanceador en barcelona"
+  import_playbook: playbooks/03_nginx.yml
+
+- name: "Bastionado UFW"
+  import_playbook: playbooks/04_bastionado.yml

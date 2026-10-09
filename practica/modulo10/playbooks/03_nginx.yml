@@ -1,0 +1,48 @@
+---
+- name: "Fase 2b — Nginx balanceador en barcelona"
+  hosts: barcelona
+  become: true
+  tags: [despliegue, nginx]
+
+  vars:
+    nginx_image: nginx:1.27-alpine
+    nginx_port: 80
+    nginx_conf_dir: /etc/nginx/quotes
+
+  tasks:
+    - name: Crear directorio de configuración de nginx
+      file:
+        path: "{{ nginx_conf_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Renderizar configuración nginx
+      template:
+        src: templates/quotes.conf.j2
+        dest: "{{ nginx_conf_dir }}/quotes.conf"
+        mode: '0644'
+      notify: Recrear contenedor nginx
+
+    - name: Desplegar contenedor nginx
+      community.docker.docker_container:
+        name: nginx
+        image: "{{ nginx_image }}"
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "{{ nginx_port }}:80"
+        volumes:
+          - "{{ nginx_conf_dir }}/quotes.conf:/etc/nginx/conf.d/default.conf:ro"
+
+  handlers:
+    - name: Recrear contenedor nginx
+      community.docker.docker_container:
+        name: nginx
+        image: "{{ nginx_image }}"
+        state: started
+        restart_policy: unless-stopped
+        recreate: true
+        ports:
+          - "{{ nginx_port }}:80"
+        volumes:
+          - "{{ nginx_conf_dir }}/quotes.conf:/etc/nginx/conf.d/default.conf:ro"

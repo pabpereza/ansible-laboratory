@@ -1,0 +1,4 @@
+allowed_ports:
+  - port: "{{ app_port }}"
+    proto: tcp
+    src: any

@@ -1,0 +1,32 @@
+# Generado por Ansible para {{ inventory_hostname }}
+services:
+  postgres:
+    image: {{ postgres_image }}
+    environment:
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+      POSTGRES_DB: "{{ postgres_db }}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "{{ postgres_user }}"]
+      interval: 10s
+      retries: 5
+
+  quotes:
+    image: "{{ app_image }}"
+    ports:
+      - "{{ app_port }}:80"
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+      POSTGRES_DB: "{{ postgres_db }}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
